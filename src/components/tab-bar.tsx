@@ -8,6 +8,7 @@ import { Text } from '@/components/ui/text';
 import { Fonts, Radius, Spacing } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
+import { requirePro } from '@/lib/subscription';
 
 const TABS: Record<string, { label: string; icon: IconName }> = {
   index: { label: 'Home', icon: Icons.home },
@@ -71,7 +72,7 @@ export function TabBar({ state, navigation, insets }: BottomTabBarProps) {
             accessibilityLabel="Add expense"
             onPress={() => {
               if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              router.push('/expense');
+              if (requirePro()) router.push('/expense');
             }}
             style={({ pressed }) => [
               styles.fab,

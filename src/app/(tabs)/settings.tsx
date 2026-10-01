@@ -13,6 +13,7 @@ import { useSubmit } from '@/hooks/use-submit';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDateKey, formatMoney, toDateKey } from '@/lib/format';
 import { currentCycle, eraseAll, useAccount, useCycles } from '@/lib/store';
+import { manageSubscription, purchasesSupported, requirePro, restore, useIsPro } from '@/lib/subscription';
 
 export default function SettingsScreen() {
   const theme = useTheme();
@@ -20,8 +21,21 @@ export default function SettingsScreen() {
   const account = useAccount();
   const cycle = currentCycle(useCycles());
   const [submit] = useSubmit();
+  const isPro = useIsPro();
 
   if (!account) return null;
+
+  async function onRestore() {
+    try {
+      const ok = await restore();
+      Alert.alert(
+        ok ? 'Purchases restored' : 'Nothing to restore',
+        ok ? 'Salary Survival Pro is active.' : 'We could not find an active subscription for this account.',
+      );
+    } catch {
+      Alert.alert('Restore failed', 'Please check your connection and try again.');
+    }
+  }
   const currency = getCurrency(account.currency);
 
   function confirmErase() {
@@ -67,6 +81,23 @@ export default function SettingsScreen() {
         </Card>
       </Pressable>
 
+      <Pressable onPress={() => (isPro ? manageSubscription().catch(() => {}) : router.push('/paywall'))}>
+        <View style={[styles.pro, { backgroundColor: theme.hero }]}>
+          <View style={styles.proIcon}>
+            <Icon name={Icons.sparkles} size={18} color={theme.hero} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text variant="headline" style={{ color: theme.heroText }}>
+              {isPro ? 'Salary Survival Pro' : 'Upgrade to Pro'}
+            </Text>
+            <Text variant="caption" style={{ color: theme.heroMuted }}>
+              {isPro ? 'Active · Manage subscription' : 'Unlock expenses, budgets and insights.'}
+            </Text>
+          </View>
+          <Icon name={Icons.forward} size={13} color={theme.heroMuted} />
+        </View>
+      </Pressable>
+
       <Group title="Preferences">
         <Row
           icon={Icons.globe}
@@ -89,7 +120,13 @@ export default function SettingsScreen() {
       </Group>
 
       <Group title="Money">
-        <Row icon={Icons.budget} label="Category budgets" onPress={() => router.push('/budgets')} />
+        <Row
+          icon={Icons.budget}
+          label="Category budgets"
+          onPress={() => {
+            if (requirePro()) router.push('/budgets');
+          }}
+        />
         <Row icon={Icons.history} label="Salary history" onPress={() => router.push('/history')} />
         <Row icon={Icons.salary} label="Start a new salary cycle" onPress={() => router.push('/salary')} />
         {cycle && (
@@ -101,6 +138,12 @@ export default function SettingsScreen() {
           />
         )}
       </Group>
+
+      {purchasesSupported && (
+        <Group title="Subscription">
+          <Row icon={Icons.history} label="Restore purchases" onPress={onRestore} />
+        </Group>
+      )}
 
       <Group title="Data">
         <Row icon={Icons.trash} label="Erase all data" danger onPress={confirmErase} />
@@ -199,6 +242,23 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.three - 4,
+  },
+  pro: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three - 4,
+    padding: Spacing.three,
+    borderRadius: 24,
+    borderCurve: 'continuous',
+    experimental_backgroundImage: 'radial-gradient(circle at 100% 0%, rgba(75,227,176,0.3) 0%, transparent 60%)',
+  },
+  proIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    backgroundColor: '#4BE3B0',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   rowIcon: {
     width: 34,

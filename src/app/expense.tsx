@@ -9,9 +9,11 @@ import { Icons } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { type CategoryId, type PaymentMethod } from '@/constants/categories';
 import { Fonts, Radius, Spacing } from '@/constants/theme';
+import { ProLock } from '@/components/pro-lock';
 import { useSubmit } from '@/hooks/use-submit';
 import { useTheme } from '@/hooks/use-theme';
 import { formatMoney, parseAmount, todayKey } from '@/lib/format';
+import { useIsPro } from '@/lib/subscription';
 import {
   currentCycle,
   deleteExpense,
@@ -30,8 +32,27 @@ export default function ExpenseScreen() {
   const account = useAccount();
   const cycles = useCycles();
   const expenses = useExpenses();
+  const isPro = useIsPro();
 
-  if (!cycles || !expenses) {
+  // Adding expenses is a Pro feature; existing ones stay viewable and editable.
+  if (!id && isPro === false) {
+    return (
+      <>
+        <Stack.Screen
+          options={{
+            title: '',
+            headerLeft: () => <HeaderTextButton title="Close" onPress={() => router.back()} />,
+          }}
+        />
+        <ProLock
+          title="Track every expense"
+          body="Upgrade to Pro to record expenses, see where your salary goes and get alerts before you overspend."
+        />
+      </>
+    );
+  }
+
+  if (!cycles || !expenses || (!id && isPro === undefined)) {
     return <ActivityIndicator color={theme.primary} style={{ marginTop: Spacing.six }} />;
   }
 

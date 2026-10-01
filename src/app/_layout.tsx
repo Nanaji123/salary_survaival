@@ -16,6 +16,7 @@ import { Fonts } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 import { convex, useAccount, useDeviceId } from '@/lib/store';
+import { configurePurchases } from '@/lib/subscription';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -51,6 +52,11 @@ function AppNavigator() {
   useEffect(() => {
     if (!loading) SplashScreen.hideAsync();
   }, [loading]);
+
+  // Purchases are tied to the device account when one exists (configure is a no-op after the first call).
+  useEffect(() => {
+    configurePurchases(deviceId);
+  }, [deviceId]);
 
   const navTheme = scheme === 'dark' ? DarkTheme : DefaultTheme;
 
@@ -90,6 +96,7 @@ function AppNavigator() {
           <Stack.Screen name="expense" options={{ presentation: 'modal' }} />
           <Stack.Screen name="salary" options={{ presentation: 'modal' }} />
           <Stack.Screen name="edit-profile" options={{ presentation: 'modal', title: 'Profile' }} />
+          <Stack.Screen name="paywall" options={{ presentation: 'fullScreenModal', headerShown: false }} />
         </Stack.Protected>
 
         <Stack.Screen name="currency" options={{ presentation: 'modal', title: 'Currency' }} />

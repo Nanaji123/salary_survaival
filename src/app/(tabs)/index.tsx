@@ -18,6 +18,7 @@ import { Fonts, MaxContentWidth, Radius, Spacing, TabBarSpace } from '@/constant
 import { useTheme } from '@/hooks/use-theme';
 import { budgetStatuses } from '@/lib/analytics';
 import { formatMoney, greeting } from '@/lib/format';
+import { requirePro, useIsPro } from '@/lib/subscription';
 import {
   currentCycle,
   summarize,
@@ -58,17 +59,7 @@ export default function HomeScreen() {
       <ScreenTitle
         eyebrow={greeting()}
         title={account?.name || 'Welcome'}
-        right={
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Profile"
-            onPress={() => router.push('/edit-profile')}
-            style={[styles.avatar, { backgroundColor: theme.text }]}>
-            <Text variant="headline" style={{ color: theme.background }}>
-              {(account?.name || '?').charAt(0).toUpperCase()}
-            </Text>
-          </Pressable>
-        }
+        right={<HeaderAction name={account?.name} />}
       />
 
       {loading ? (
@@ -90,7 +81,7 @@ export default function HomeScreen() {
 
           <View style={styles.quick}>
             <QuickAction icon={Icons.salary} label="New salary" onPress={() => router.push('/salary')} />
-            <QuickAction icon={Icons.budget} label="Budgets" onPress={() => router.push('/budgets')} />
+            <QuickAction icon={Icons.budget} label="Budgets" onPress={() => openBudgets()} />
             <QuickAction icon={Icons.history} label="History" onPress={() => router.push('/history')} />
           </View>
 
@@ -100,7 +91,7 @@ export default function HomeScreen() {
             return (
               <Pressable
                 key={a.category}
-                onPress={() => router.push('/budgets')}
+                onPress={() => openBudgets()}
                 style={[styles.alert, { backgroundColor: over ? theme.dangerSoft : theme.warningSoft }]}>
                 <Icon name={Icons.alert} size={16} color={over ? theme.danger : theme.warning} />
                 <Text variant="caption" style={{ flex: 1, color: theme.text, fontFamily: Fonts.semibold }}>
@@ -115,14 +106,14 @@ export default function HomeScreen() {
 
           <SavingsCard goal={account?.savingsGoal} remaining={summary.remaining} currency={currency} />
 
-          <Section title="Budgets" action={statuses.length ? 'Manage' : undefined} onAction={() => router.push('/budgets')}>
+          <Section title="Budgets" action={statuses.length ? 'Manage' : undefined} onAction={() => openBudgets()}>
             <Card style={{ gap: Spacing.three }}>
               {statuses.length === 0 ? (
                 <View style={styles.inlineEmpty}>
                   <Text variant="body" color="textSecondary" style={{ flex: 1 }}>
                     Set limits per category to stay on track.
                   </Text>
-                  <Button title="Create" compact variant="secondary" onPress={() => router.push('/budgets')} />
+                  <Button title="Create" compact variant="secondary" onPress={() => openBudgets()} />
                 </View>
               ) : (
                 statuses.slice(0, 3).map((s) => {
@@ -171,6 +162,53 @@ export default function HomeScreen() {
       )}
     </ScrollView>
   );
+}
+
+/** Upgrade pill for free users; avatar with a Pro badge for subscribers. */
+function HeaderAction({ name }: { name?: string }) {
+  const theme = useTheme();
+  const isPro = useIsPro();
+
+  if (isPro === false) {
+    return (
+      <Pressable
+        accessibilityRole="button"
+        accessibilityLabel="Upgrade to Pro"
+        onPress={() => router.push('/paywall')}
+        style={({ pressed }) => [
+          styles.upgrade,
+          { backgroundColor: theme.hero, transform: [{ scale: pressed ? 0.96 : 1 }] },
+        ]}>
+        <View style={styles.upgradeIcon}>
+          <Icon name={Icons.sparkles} size={11} color={theme.hero} />
+        </View>
+        <Text variant="caption" style={{ color: theme.heroText, fontFamily: Fonts.bold }}>
+          Upgrade
+        </Text>
+      </Pressable>
+    );
+  }
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Profile"
+      onPress={() => router.push('/edit-profile')}
+      style={[styles.avatar, { backgroundColor: theme.text }]}>
+      <Text variant="headline" style={{ color: theme.background }}>
+        {(name || '?').charAt(0).toUpperCase()}
+      </Text>
+      {isPro && (
+        <View style={[styles.proBadge, { borderColor: theme.background }]}>
+          <Text style={styles.proBadgeText}>PRO</Text>
+        </View>
+      )}
+    </Pressable>
+  );
+}
+
+function openBudgets() {
+  if (requirePro()) router.push('/budgets');
 }
 
 function QuickAction({ icon, label, onPress }: { icon: IconName; label: string; onPress: () => void }) {
@@ -255,6 +293,41 @@ const styles = StyleSheet.create({
     borderRadius: 22,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  upgrade: {
+    height: 40,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 7,
+    paddingLeft: 6,
+    paddingRight: 14,
+    borderRadius: Radius.pill,
+    boxShadow: '0 6px 18px rgba(75,227,176,0.35)',
+    experimental_backgroundImage: 'linear-gradient(120deg, rgba(75,227,176,0.35), transparent 70%)',
+  },
+  upgradeIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: '#4BE3B0',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  proBadge: {
+    position: 'absolute',
+    bottom: -4,
+    right: -6,
+    backgroundColor: '#4BE3B0',
+    borderRadius: Radius.pill,
+    borderWidth: 2,
+    paddingHorizontal: 5,
+    paddingVertical: 1,
+  },
+  proBadgeText: {
+    color: '#0E1116',
+    fontFamily: Fonts.extrabold,
+    fontSize: 8,
+    letterSpacing: 0.5,
   },
   empty: {
     alignItems: 'center',

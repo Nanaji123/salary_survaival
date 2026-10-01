@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { StyleSheet, TextInput, View } from 'react-native';
 
+import { ProLock } from '@/components/pro-lock';
 import { Card } from '@/components/ui/card';
 import { CategoryIcon } from '@/components/ui/category-icon';
 import { ProgressBar } from '@/components/ui/charts';
@@ -12,10 +13,24 @@ import { useSubmit } from '@/hooks/use-submit';
 import { useTheme } from '@/hooks/use-theme';
 import { budgetStatuses } from '@/lib/analytics';
 import { currencySymbol, formatMoney, parseAmount, sanitizeAmountInput } from '@/lib/format';
+import { useIsPro } from '@/lib/subscription';
 import { currentCycle, setBudget, useAccount, useBudgets, useCycles, useExpenses } from '@/lib/store';
 
 /** Per-category monthly limits with live progress for the current cycle. */
 export default function BudgetsScreen() {
+  const isPro = useIsPro();
+  if (isPro === false) {
+    return (
+      <ProLock
+        title="Budgets are a Pro feature"
+        body="Set a limit for each category and get warned at 80% and when you go over."
+      />
+    );
+  }
+  return <Budgets />;
+}
+
+function Budgets() {
   const currency = useAccount()?.currency ?? 'USD';
   const budgets = useBudgets();
   const cycle = currentCycle(useCycles());

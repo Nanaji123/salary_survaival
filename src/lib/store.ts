@@ -7,6 +7,7 @@ import { useSyncExternalStore } from 'react';
 import { Platform } from 'react-native';
 
 import type { CategoryId, PaymentMethod } from '@/constants/categories';
+import { identifyPurchaser } from '@/lib/subscription';
 
 export type Account = Doc<'users'>;
 export type SalaryCycle = Doc<'cycles'>;
@@ -81,6 +82,7 @@ export async function signInWithDevice() {
     clearTimeout(timer);
   }
   setSession(id);
+  identifyPurchaser(id);
 }
 
 // Queries. Each returns `undefined` while loading.
