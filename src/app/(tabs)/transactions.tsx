@@ -2,12 +2,13 @@ import { useMemo, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { EmptyState, expenseSuggestions } from '@/components/empty-state';
 import { ScreenTitle } from '@/components/section';
 import { TransactionRow } from '@/components/transaction-row';
 import { Card } from '@/components/ui/card';
 import { Divider } from '@/components/ui/divider';
 import { Chip, SearchBar } from '@/components/ui/form';
-import { Icon, Icons } from '@/components/ui/icon';
+import { Icons } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { getCategory, type CategoryId } from '@/constants/categories';
 import { MaxContentWidth, Spacing, TabBarSpace } from '@/constants/theme';
@@ -76,17 +77,21 @@ export default function TransactionsScreen() {
       {expenses === undefined ? (
         <ActivityIndicator color={theme.primary} style={{ marginTop: Spacing.five }} />
       ) : groups.length === 0 ? (
-        <View style={styles.empty}>
-          <View style={[styles.emptyIcon, { backgroundColor: theme.card }]}>
-            <Icon name={query || filter !== 'all' ? Icons.search : Icons.receipt} size={24} color={theme.textTertiary} />
-          </View>
-          <Text variant="headline">{query || filter !== 'all' ? 'No matches' : 'No expenses yet'}</Text>
-          <Text variant="body" color="textSecondary" style={{ textAlign: 'center' }}>
-            {query || filter !== 'all'
-              ? 'Try a different search or filter.'
-              : 'Tap the + button to record your first expense.'}
-          </Text>
-        </View>
+        query || filter !== 'all' ? (
+          <EmptyState
+            icon={Icons.search}
+            title="No matches"
+            body="Try a different search or clear the filter to see everything."
+          />
+        ) : (
+          <EmptyState
+            icon={Icons.receipt}
+            title="No expenses yet"
+            body="Every expense you log shows up here, grouped by day. Start with one tap, or just say it."
+            suggestions={expenseSuggestions()}
+            suggestionsTitle="Quick add"
+          />
+        )
       ) : (
         <>
           <View style={styles.totalRow}>
@@ -153,19 +158,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: Spacing.one,
     marginTop: Spacing.two,
-  },
-  empty: {
-    alignItems: 'center',
-    gap: Spacing.two,
-    paddingVertical: Spacing.six,
-    paddingHorizontal: Spacing.four,
-  },
-  emptyIcon: {
-    width: 60,
-    height: 60,
-    borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: Spacing.one,
   },
 });

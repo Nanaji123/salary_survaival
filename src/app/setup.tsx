@@ -26,6 +26,7 @@ export default function SetupScreen() {
         total={2}
         title="Let's set you up"
         subtitle="A few details so the plan fits the way you get paid."
+        icon={Icons.person}
       />
       <Field
         label="Your name"

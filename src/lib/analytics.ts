@@ -146,3 +146,31 @@ export function groupByDay(items: Expense[]) {
   }
   return groups.sort((a, b) => b.date.localeCompare(a.date));
 }
+
+/** Cumulative spending for each day of the cycle up to today, for the pace chart. */
+export function cumulativeSpending(cycle: SalaryCycle, expenses: Expense[]) {
+  let running = 0;
+  return dailySpending(cycle, expenses).map((d) => (running += d.amount));
+}
+
+/** Total spent per weekday, Monday first, plus how many of that weekday the cycle has covered. */
+export function weekdaySpending(cycle: SalaryCycle, expenses: Expense[]) {
+  const totals = Array<number>(7).fill(0);
+  const days = Array<number>(7).fill(0);
+  for (const d of dailySpending(cycle, expenses)) {
+    const i = (fromDateKey(d.date).getDay() + 6) % 7;
+    totals[i] += d.amount;
+    days[i] += 1;
+  }
+  const names = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+  return names.map((label, i) => ({ label, total: totals[i], average: days[i] ? totals[i] / days[i] : 0 }));
+}
+
+/** Spending split by how it was paid; expenses saved without a method are left out. */
+export function methodSplit(cycle: SalaryCycle, expenses: Expense[]) {
+  const totals = new Map<string, number>();
+  for (const e of expensesFor(expenses, cycle._id)) {
+    if (e.method) totals.set(e.method, (totals.get(e.method) ?? 0) + e.amount);
+  }
+  return [...totals.entries()].map(([method, amount]) => ({ method, amount })).sort((a, b) => b.amount - a.amount);
+}

@@ -38,18 +38,26 @@ export function ScreenTitle({
   eyebrow,
   title,
   right,
+  badge,
 }: {
   eyebrow?: string;
   title: string;
   right?: React.ReactNode;
+  /** Small element shown before the eyebrow, e.g. a PRO pill. */
+  badge?: React.ReactNode;
 }) {
   return (
     <View style={styles.titleRow}>
       <View style={{ flex: 1 }}>
-        {eyebrow && (
-          <Text variant="caption" color="textSecondary">
-            {eyebrow}
-          </Text>
+        {(eyebrow || badge) && (
+          <View style={styles.eyebrowRow}>
+            {badge}
+            {eyebrow && (
+              <Text variant="caption" color="textSecondary">
+                {eyebrow}
+              </Text>
+            )}
+          </View>
         )}
         <Text variant="title" numberOfLines={1}>
           {title}
@@ -69,6 +77,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: Spacing.one,
+  },
+  eyebrowRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.two,
   },
   titleRow: {
     flexDirection: 'row',

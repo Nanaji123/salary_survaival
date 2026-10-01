@@ -10,8 +10,9 @@ import { ConvexProvider } from 'convex/react';
 import { DarkTheme, DefaultTheme, Stack, ThemeProvider } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 
+import { AnimatedSplash } from '@/components/splash';
 import { Fonts } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
@@ -49,9 +50,22 @@ function AppNavigator() {
   const loading = deviceId !== null && account === undefined;
   const onboarded = account?.onboarded ?? false;
 
+  // The branded splash stays up until the account is known (and briefly longer so the logo
+  // animation reads), so a returning user goes straight to Home instead of seeing Welcome first.
+  // It only shows on launch; later account loads (e.g. right after "Get Started") keep the navigator.
+  const [minElapsed, setMinElapsed] = useState(false);
+  const [gaveUp, setGaveUp] = useState(false);
+  const [booted, setBooted] = useState(false);
   useEffect(() => {
-    if (!loading) SplashScreen.hideAsync();
-  }, [loading]);
+    const short = setTimeout(() => setMinElapsed(true), 1300);
+    // Never trap the user on the splash if the connection is slow.
+    const long = setTimeout(() => setGaveUp(true), 7000);
+    return () => {
+      clearTimeout(short);
+      clearTimeout(long);
+    };
+  }, []);
+  if (!booted && ((!loading && minElapsed) || gaveUp)) setBooted(true);
 
   // Purchases are tied to the device account when one exists (configure is a no-op after the first call).
   useEffect(() => {
@@ -59,6 +73,15 @@ function AppNavigator() {
   }, [deviceId]);
 
   const navTheme = scheme === 'dark' ? DarkTheme : DefaultTheme;
+
+  if (!booted) {
+    return (
+      <>
+        <StatusBar style="light" />
+        <AnimatedSplash onShown={() => SplashScreen.hideAsync()} />
+      </>
+    );
+  }
 
   return (
     <ThemeProvider
@@ -97,6 +120,8 @@ function AppNavigator() {
           <Stack.Screen name="salary" options={{ presentation: 'modal' }} />
           <Stack.Screen name="edit-profile" options={{ presentation: 'modal', title: 'Profile' }} />
           <Stack.Screen name="paywall" options={{ presentation: 'fullScreenModal', headerShown: false }} />
+          <Stack.Screen name="assistant" options={{ presentation: 'fullScreenModal', headerShown: false }} />
+          <Stack.Screen name="ai-plan" options={{ presentation: 'fullScreenModal', headerShown: false }} />
         </Stack.Protected>
 
         <Stack.Screen name="currency" options={{ presentation: 'modal', title: 'Currency' }} />

@@ -8,6 +8,7 @@ import Svg, { Circle, Path } from 'react-native-svg';
 import { Icon, Icons, type IconName } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { Fonts, MaxContentWidth, Radius, Spacing } from '@/constants/theme';
+import { requestOnboardingPermissions } from '@/lib/permissions';
 import { signInWithDevice } from '@/lib/store';
 
 const INK = '#0E1116';
@@ -27,8 +28,10 @@ export default function WelcomeScreen() {
   async function getStarted() {
     setLoading(true);
     try {
-      await signInWithDevice();
-      router.push('/setup');
+      const onboarded = await signInWithDevice();
+      await requestOnboardingPermissions();
+      // A returning user is taken straight to Home when the account flips to onboarded.
+      if (!onboarded) router.push('/setup');
     } catch {
       Alert.alert('Could not connect', 'Please check your internet connection and try again.');
     } finally {

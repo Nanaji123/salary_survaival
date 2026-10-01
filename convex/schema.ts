@@ -40,6 +40,13 @@ export default defineSchema({
     savingsGoal: v.optional(v.number()),
   }).index('by_device', ['deviceId']),
 
+  /** AI calls per user per day, used to cap usage. */
+  aiUsage: defineTable({
+    userId: v.id('users'),
+    day: v.string(), // UTC YYYY-MM-DD
+    count: v.number(),
+  }).index('by_user_day', ['userId', 'day']),
+
   /** Spending limit per category, applied to every salary cycle. */
   budgets: defineTable({
     userId: v.id('users'),

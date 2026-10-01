@@ -156,10 +156,20 @@ export default function PaywallScreen() {
     }
     setBusy('buy');
     try {
-      const ok = await purchase(plan.pkg);
-      if (ok) router.back();
-    } catch {
-      Alert.alert('Purchase failed', 'Something went wrong with the store. You have not been charged.');
+      const result = await purchase(plan.pkg);
+      if (result === 'pro') router.back();
+      else if (result === 'inactive') {
+        Alert.alert(
+          'Purchase received',
+          'The store accepted the purchase but Pro is not active yet. Tap Restore purchases, or check that this product is attached to your Pro entitlement in RevenueCat.',
+        );
+      }
+    } catch (error) {
+      const message = (error as { message?: string }).message;
+      Alert.alert(
+        'Purchase failed',
+        __DEV__ && message ? message : 'Something went wrong with the store. You have not been charged.',
+      );
     } finally {
       setBusy(null);
     }
@@ -201,14 +211,20 @@ export default function PaywallScreen() {
           styles.content,
           { paddingTop: insets.top + Spacing.two, paddingBottom: insets.bottom + Spacing.three },
         ]}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel="Close"
-          hitSlop={12}
-          onPress={() => router.back()}
-          style={styles.close}>
-          <Icon name={Icons.close} size={14} color={MUTED} />
-        </Pressable>
+        <View style={styles.topRow}>
+          <View style={styles.proBadge}>
+            <Icon name={Icons.sparkles} size={11} color={INK} />
+            <Text style={styles.proBadgeText}>PRO</Text>
+          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close"
+            hitSlop={12}
+            onPress={() => router.back()}
+            style={styles.close}>
+            <Icon name={Icons.close} size={14} color={MUTED} />
+          </Pressable>
+        </View>
 
         <View style={styles.hero}>
           <View style={styles.badgeIcon}>
@@ -287,22 +303,6 @@ export default function PaywallScreen() {
           </View>
         )}
 
-        {plan?.trial && (
-          <View style={styles.timeline}>
-            <TimelineStep
-              icon={Icons.sparkles}
-              title="Today"
-              body="Full access to every Pro feature. No payment now."
-              first
-            />
-            <TimelineStep
-              icon={Icons.calendar}
-              title={`Day ${trialDays}`}
-              body={`Trial ends. You'll be charged ${plan.price} unless you cancel.`}
-            />
-          </View>
-        )}
-
         <View style={{ gap: Spacing.three - 4 }}>
           <Pressable
             accessibilityRole="button"
@@ -323,8 +323,25 @@ export default function PaywallScreen() {
             <Icon name={Icons.shield} size={12} color={MINT} />
             <Text style={styles.assureText}>{plan?.trial ? 'No payment due now · Cancel anytime' : 'Cancel anytime'}</Text>
           </View>
-          <Text style={styles.fine}>{fine}</Text>
         </View>
+
+        {plan?.trial && (
+          <View style={styles.timeline}>
+            <TimelineStep
+              icon={Icons.sparkles}
+              title="Today"
+              body="Full access to every Pro feature. No payment now."
+              first
+            />
+            <TimelineStep
+              icon={Icons.calendar}
+              title={`Day ${trialDays}`}
+              body={`Trial ends. You'll be charged ${plan.price} unless you cancel.`}
+            />
+          </View>
+        )}
+
+        <Text style={styles.fine}>{fine}</Text>
 
         <View style={styles.links}>
           <Pressable accessibilityRole="button" disabled={busy !== null} onPress={onRestore} hitSlop={8}>
@@ -387,8 +404,27 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.gutter,
     gap: Spacing.four,
   },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  proBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 5,
+    backgroundColor: MINT,
+    borderRadius: Radius.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  proBadgeText: {
+    color: INK,
+    fontFamily: Fonts.extrabold,
+    fontSize: 12,
+    letterSpacing: 1,
+  },
   close: {
-    alignSelf: 'flex-end',
     width: 32,
     height: 32,
     borderRadius: 16,

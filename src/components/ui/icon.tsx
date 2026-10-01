@@ -52,6 +52,8 @@ export const Icons = {
   alert: { ios: 'exclamationmark.triangle.fill', android: 'warning' },
   bulb: { ios: 'lightbulb.fill', android: 'lightbulb' },
   sparkles: { ios: 'sparkles', android: 'auto_awesome' },
+  mic: { ios: 'mic.fill', android: 'mic' },
+  wand: { ios: 'wand.and.stars', android: 'auto_fix_high' },
   edit: { ios: 'square.and.pencil', android: 'edit' },
   globe: { ios: 'globe', android: 'public' },
   budget: { ios: 'gauge.with.dots.needle.33percent', android: 'speed' },

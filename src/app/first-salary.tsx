@@ -1,6 +1,7 @@
 import { OnboardingHeader } from '@/components/onboarding-header';
 import { SalaryForm } from '@/components/salary-form';
 import { FormScroll } from '@/components/ui/form';
+import { Icons } from '@/components/ui/icon';
 import { addCycle, updateAccount, useAccount } from '@/lib/store';
 
 export default function FirstSalaryScreen() {
@@ -13,6 +14,7 @@ export default function FirstSalaryScreen() {
         total={2}
         title="Your salary"
         subtitle="Enter the amount you received this month. We'll track your spending against it."
+        icon={Icons.salary}
       />
       <SalaryForm
         currency={account?.currency ?? 'INR'}

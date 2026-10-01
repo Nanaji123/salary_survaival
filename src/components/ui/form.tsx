@@ -376,9 +376,25 @@ export function Chip({
 /** Calendar-style grid (7 columns) for picking the usual payday. */
 export function PaydayPicker({ value, onChange }: { value: number; onChange: (d: number) => void }) {
   const theme = useTheme();
+  const suffix = value % 10 === 1 && value !== 11 ? 'st' : value % 10 === 2 && value !== 12 ? 'nd' : value % 10 === 3 && value !== 13 ? 'rd' : 'th';
   return (
     <View>
       <FieldLabel>Usual payday</FieldLabel>
+      <View style={[styles.paydayHero, { backgroundColor: theme.hero }]}>
+        <View style={[styles.paydayIcon, { backgroundColor: theme.heroAccent }]}>
+          <Icon name={Icons.calendar} size={20} color="#0E1116" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={[styles.paydayBig, { color: theme.heroText }]}>
+            {value}
+            <Text style={[styles.paydaySuffix, { color: theme.heroAccent }]}>{suffix}</Text>
+            <Text style={[styles.paydayOf, { color: theme.heroMuted }]}> of every month</Text>
+          </Text>
+          <Text variant="caption" style={{ color: theme.heroMuted }}>
+            We count down to this day and plan your daily limit around it.
+          </Text>
+        </View>
+      </View>
       <View style={[styles.calendar, { backgroundColor: theme.card }]}>
         {Array.from({ length: 31 }, (_, i) => i + 1).map((d) => {
           const selected = d === value;
@@ -406,11 +422,11 @@ export function PaydayPicker({ value, onChange }: { value: number; onChange: (d:
           );
         })}
       </View>
-      <Text variant="caption" color="textSecondary" style={{ marginTop: Spacing.two, marginLeft: Spacing.one }}>
-        {value >= 29
-          ? `Day ${value} of each month (or the last day in shorter months)`
-          : `Day ${value} of each month`}
-      </Text>
+      {value >= 29 && (
+        <Text variant="caption" color="textSecondary" style={{ marginTop: Spacing.two, marginLeft: Spacing.one }}>
+          In shorter months this falls on the last day.
+        </Text>
+      )}
     </View>
   );
 }
@@ -563,6 +579,37 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
     borderCurve: 'continuous',
     padding: Spacing.two,
+    marginTop: Spacing.two,
+  },
+  paydayHero: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three,
+    borderRadius: Radius.lg,
+    borderCurve: 'continuous',
+    padding: Spacing.three,
+  },
+  paydayIcon: {
+    width: 46,
+    height: 46,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  paydayBig: {
+    fontFamily: Fonts.extrabold,
+    fontSize: 30,
+    lineHeight: 36,
+    letterSpacing: -0.6,
+  },
+  paydaySuffix: {
+    fontFamily: Fonts.extrabold,
+    fontSize: 18,
+  },
+  paydayOf: {
+    fontFamily: Fonts.semibold,
+    fontSize: 15,
+    letterSpacing: 0,
   },
   dayCell: {
     width: `${100 / 7}%`,

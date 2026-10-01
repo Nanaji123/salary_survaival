@@ -1,8 +1,11 @@
 import { useState } from 'react';
+import { View } from 'react-native';
 
 import { Button } from '@/components/ui/button';
 import { AmountField, DateStepper, Field } from '@/components/ui/form';
 import { Icons } from '@/components/ui/icon';
+import { Text } from '@/components/ui/text';
+import { Spacing } from '@/constants/theme';
 import { parseAmount, todayKey } from '@/lib/format';
 import { useSubmit } from '@/hooks/use-submit';
 
@@ -35,7 +38,13 @@ export function SalaryForm({
         currency={currency}
         autoFocus={!initial}
       />
-      <DateStepper label="Received on" value={receivedOn} onChange={setReceivedOn} />
+      <View style={{ gap: Spacing.two }}>
+        <DateStepper label="Date it was credited" value={receivedOn} onChange={setReceivedOn} />
+        <Text variant="caption" color="textSecondary" style={{ marginLeft: Spacing.one }}>
+          The day this salary hit your account. It starts your month: spending is tracked from this
+          date until your next salary.
+        </Text>
+      </View>
       <Field
         label="Note (optional)"
         value={note}

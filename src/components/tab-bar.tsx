@@ -70,6 +70,12 @@ export function TabBar({ state, navigation, insets }: BottomTabBarProps) {
           <Pressable
             accessibilityRole="button"
             accessibilityLabel="Add expense"
+            accessibilityHint="Long press to add by voice"
+            delayLongPress={350}
+            onLongPress={() => {
+              if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Heavy);
+              router.push('/assistant');
+            }}
             onPress={() => {
               if (Platform.OS !== 'web') Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
               if (requirePro()) router.push('/expense');

@@ -3,6 +3,7 @@ import { Tabs } from 'expo-router/tabs';
 import { useEffect } from 'react';
 
 import { TabBar } from '@/components/tab-bar';
+import { ensurePermissionsOnLaunch } from '@/lib/permissions';
 import { useIsPro } from '@/lib/subscription';
 
 // Show the plans once per app launch to users without Pro.
@@ -21,6 +22,12 @@ export default function TabsLayout() {
       return () => clearTimeout(t);
     }
   }, [isPro]);
+
+  // Ask for microphone and notification access when the app opens, if not already decided.
+  useEffect(() => {
+    const t = setTimeout(() => ensurePermissionsOnLaunch(), 900);
+    return () => clearTimeout(t);
+  }, []);
 
   return (
     <Tabs tabBar={(props) => <TabBar {...props} />} screenOptions={{ headerShown: false }}>

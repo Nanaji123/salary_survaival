@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
-import Svg, { Circle, Line, Path, Rect } from 'react-native-svg';
+import Svg, { Circle, Defs, Line, LinearGradient, Path, Rect, Stop } from 'react-native-svg';
 
 import { Text } from '@/components/ui/text';
 import { Spacing } from '@/constants/theme';
@@ -318,3 +319,94 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
 });
+
+/**
+ * Cumulative spending as a smooth area against a dashed "even pace" line from zero to the salary.
+ * Staying under the dashed line means the money will last to payday.
+ */
+export function TrendChart({
+  points,
+  totalDays,
+  limit,
+  height = 170,
+  color,
+  paceColor,
+  gridColor,
+  labelColor,
+  formatValue,
+}: {
+  points: number[];
+  totalDays: number;
+  limit: number;
+  height?: number;
+  color: string;
+  paceColor: string;
+  gridColor: string;
+  labelColor: string;
+  formatValue: (v: number) => string;
+}) {
+  const [width, setWidth] = useState(0);
+  const pad = { top: 14, bottom: 6, left: 4, right: 10 };
+  const max = Math.max(limit, ...points, 1);
+  const w = Math.max(width - pad.left - pad.right, 1);
+  const h = height - pad.top - pad.bottom;
+  const x = (i: number) => pad.left + (totalDays <= 1 ? 0 : (i / (totalDays - 1)) * w);
+  const y = (v: number) => pad.top + h - (v / max) * h;
+
+  const line = points.map((v, i) => `${i === 0 ? 'M' : 'L'} ${x(i).toFixed(1)} ${y(v).toFixed(1)}`).join(' ');
+  const last = points.length - 1;
+  const area =
+    points.length > 0 ? `${line} L ${x(last).toFixed(1)} ${pad.top + h} L ${x(0).toFixed(1)} ${pad.top + h} Z` : '';
+
+  return (
+    <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)} style={{ height }}>
+      {width > 0 && (
+        <Svg width={width} height={height}>
+          <Defs>
+            <LinearGradient id="trendFill" x1="0" y1="0" x2="0" y2="1">
+              <Stop offset="0" stopColor={color} stopOpacity={0.35} />
+              <Stop offset="1" stopColor={color} stopOpacity={0} />
+            </LinearGradient>
+          </Defs>
+          {[0, 0.5, 1].map((f) => (
+            <Line
+              key={f}
+              x1={pad.left}
+              x2={pad.left + w}
+              y1={pad.top + h * f}
+              y2={pad.top + h * f}
+              stroke={gridColor}
+              strokeDasharray={f === 1 ? undefined : '3 4'}
+              strokeWidth={1}
+            />
+          ))}
+          {/* Even pace: spending the whole salary evenly across the cycle. */}
+          <Line x1={x(0)} y1={y(0)} x2={x(totalDays - 1)} y2={y(limit)} stroke={paceColor} strokeWidth={1.5} strokeDasharray="5 5" />
+          {points.length > 1 && <Path d={area} fill="url(#trendFill)" />}
+          {points.length > 0 && <Path d={line} stroke={color} strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round" fill="none" />}
+          {points.length > 0 && (
+            <>
+              <Circle cx={x(last)} cy={y(points[last])} r={7} fill={color} opacity={0.25} />
+              <Circle cx={x(last)} cy={y(points[last])} r={4} fill={color} />
+            </>
+          )}
+        </Svg>
+      )}
+      <Text variant="caption" style={{ position: 'absolute', top: 0, right: 12, color: labelColor, fontSize: 10 }}>
+        Salary {formatValue(limit)}
+      </Text>
+    </View>
+  );
+}
+
+/** One horizontal bar split into proportional, rounded segments. */
+export function StackedBar({ segments, height = 12 }: { segments: { key: string; value: number; color: string }[]; height?: number }) {
+  const total = segments.reduce((s, x) => s + x.value, 0) || 1;
+  return (
+    <View style={{ height, borderRadius: height / 2, overflow: 'hidden', flexDirection: 'row', gap: 2 }}>
+      {segments.map((s) => (
+        <View key={s.key} style={{ flex: s.value / total, backgroundColor: s.color, borderRadius: height / 2 }} />
+      ))}
+    </View>
+  );
+}

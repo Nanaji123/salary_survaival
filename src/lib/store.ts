@@ -7,7 +7,7 @@ import { useSyncExternalStore } from 'react';
 import { Platform } from 'react-native';
 
 import type { CategoryId, PaymentMethod } from '@/constants/categories';
-import { identifyPurchaser } from '@/lib/subscription';
+import { identifyPurchaser, resetPurchaser } from '@/lib/subscription';
 
 export type Account = Doc<'users'>;
 export type SalaryCycle = Doc<'cycles'>;
@@ -49,6 +49,8 @@ function requireDeviceId() {
   return deviceId;
 }
 
+export const getDeviceId = requireDeviceId;
+
 async function readDeviceId(): Promise<string> {
   try {
     if (Platform.OS === 'ios') {
@@ -68,7 +70,7 @@ async function readDeviceId(): Promise<string> {
   return `local-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-/** Signs in with the device ID, creating the account on first launch. */
+/** Signs in with the device ID, creating the account on first launch. Resolves whether setup is already done. */
 export async function signInWithDevice() {
   const id = deviceId ?? (await readDeviceId());
   // Mutations wait for a connection indefinitely; fail fast so the user can retry.
@@ -81,8 +83,16 @@ export async function signInWithDevice() {
   } finally {
     clearTimeout(timer);
   }
+  const account = await convex.query(api.users.get, { deviceId: id });
   setSession(id);
   identifyPurchaser(id);
+  return account?.onboarded ?? false;
+}
+
+/** Signs out of this device. The account and its data stay in the cloud; signing in again restores them. */
+export function signOut() {
+  setSession(null);
+  resetPurchaser();
 }
 
 // Queries. Each returns `undefined` while loading.

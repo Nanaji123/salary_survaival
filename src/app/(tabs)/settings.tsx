@@ -12,7 +12,7 @@ import { Fonts, MaxContentWidth, Spacing, TabBarSpace } from '@/constants/theme'
 import { useSubmit } from '@/hooks/use-submit';
 import { useTheme } from '@/hooks/use-theme';
 import { formatDateKey, formatMoney, toDateKey } from '@/lib/format';
-import { currentCycle, eraseAll, useAccount, useCycles } from '@/lib/store';
+import { currentCycle, eraseAll, signOut, useAccount, useCycles } from '@/lib/store';
 import { manageSubscription, purchasesSupported, requirePro, restore, useIsPro } from '@/lib/subscription';
 
 export default function SettingsScreen() {
@@ -37,6 +37,13 @@ export default function SettingsScreen() {
     }
   }
   const currency = getCurrency(account.currency);
+
+  function confirmLogout() {
+    Alert.alert('Log out?', 'Your data stays safe in the cloud. Tap Get Started on this device to sign back in.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Log out', style: 'destructive', onPress: () => signOut() },
+    ]);
+  }
 
   function confirmErase() {
     Alert.alert(
@@ -67,13 +74,7 @@ export default function SettingsScreen() {
           </View>
           <View style={{ flex: 1, gap: 2 }}>
             <Text variant="headline">{account.name || 'Your account'}</Text>
-            <View style={styles.inline}>
-              <Icon name={Icons.device} size={11} color={theme.textSecondary} />
-              <Text variant="caption" color="textSecondary">
-                Device {account.deviceId.slice(0, 8).toUpperCase()}
-              </Text>
-            </View>
-            <Text variant="caption" color="textTertiary">
+            <Text variant="caption" color="textSecondary">
               Member since {formatDateKey(toDateKey(new Date(account._creationTime)))}
             </Text>
           </View>
@@ -98,28 +99,34 @@ export default function SettingsScreen() {
         </View>
       </Pressable>
 
-      <Group title="Preferences">
+      <View style={styles.tiles}>
+        <PlanTile
+          icon={Icons.calendar}
+          tint={theme.primarySoft}
+          ink={theme.primaryInk}
+          label="Payday"
+          value={account.payday ? `${account.payday}${ordinal(account.payday)}` : 'Set'}
+          caption="of every month"
+          onPress={() => router.push('/edit-profile')}
+        />
+        <PlanTile
+          icon={Icons.target}
+          tint={theme.warningSoft}
+          ink={theme.warning}
+          label="Savings goal"
+          value={account.savingsGoal ? formatMoney(account.savingsGoal, account.currency, { compact: true }) : 'Set'}
+          caption="kept from each salary"
+          onPress={() => router.push('/edit-profile')}
+        />
+      </View>
+
+      <Group title="Money">
         <Row
           icon={Icons.globe}
           label="Currency"
           value={`${flagEmoji(currency.country)} ${currency.code}`}
           onPress={() => router.push('/currency')}
         />
-        <Row
-          icon={Icons.calendar}
-          label="Usual payday"
-          value={account.payday ? `Day ${account.payday}` : 'Not set'}
-          onPress={() => router.push('/edit-profile')}
-        />
-        <Row
-          icon={Icons.target}
-          label="Savings goal"
-          value={account.savingsGoal ? formatMoney(account.savingsGoal, account.currency) : 'Not set'}
-          onPress={() => router.push('/edit-profile')}
-        />
-      </Group>
-
-      <Group title="Money">
         <Row
           icon={Icons.budget}
           label="Category budgets"
@@ -128,7 +135,6 @@ export default function SettingsScreen() {
           }}
         />
         <Row icon={Icons.history} label="Salary history" onPress={() => router.push('/history')} />
-        <Row icon={Icons.salary} label="Start a new salary cycle" onPress={() => router.push('/salary')} />
         {cycle && (
           <Row
             icon={Icons.edit}
@@ -139,13 +145,9 @@ export default function SettingsScreen() {
         )}
       </Group>
 
-      {purchasesSupported && (
-        <Group title="Subscription">
-          <Row icon={Icons.history} label="Restore purchases" onPress={onRestore} />
-        </Group>
-      )}
-
-      <Group title="Data">
+      <Group title="Account">
+        {purchasesSupported && <Row icon={Icons.checkCircle} label="Restore purchases" onPress={onRestore} />}
+        <Row icon={Icons.back} label="Log out" onPress={confirmLogout} />
         <Row icon={Icons.trash} label="Erase all data" danger onPress={confirmErase} />
       </Group>
 
@@ -153,6 +155,53 @@ export default function SettingsScreen() {
         Salary Survival · Your data syncs securely to the cloud.
       </Text>
     </ScrollView>
+  );
+}
+
+function ordinal(n: number) {
+  const mod100 = n % 100;
+  if (mod100 >= 11 && mod100 <= 13) return 'th';
+  return ({ 1: 'st', 2: 'nd', 3: 'rd' } as Record<number, string>)[n % 10] ?? 'th';
+}
+
+/** Tappable stat tile; each tile has its own colour so payday and savings goal read as different things. */
+function PlanTile({
+  icon,
+  tint,
+  ink,
+  label,
+  value,
+  caption,
+  onPress,
+}: {
+  icon: IconName;
+  tint: string;
+  ink: string;
+  label: string;
+  value: string;
+  caption: string;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${label}: ${value}`}
+      onPress={onPress}
+      style={({ pressed }) => [styles.tile, { backgroundColor: theme.card, opacity: pressed ? 0.7 : 1 }]}>
+      <View style={[styles.tileIcon, { backgroundColor: tint }]}>
+        <Icon name={icon} size={17} color={ink} />
+      </View>
+      <Text variant="overline" color="textSecondary" style={{ marginTop: Spacing.two }}>
+        {label}
+      </Text>
+      <Text variant="display" numberOfLines={1} adjustsFontSizeToFit style={{ fontSize: 28, lineHeight: 34, color: ink }}>
+        {value}
+      </Text>
+      <Text variant="caption" color="textTertiary">
+        {caption}
+      </Text>
+    </Pressable>
   );
 }
 
@@ -232,10 +281,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  inline: {
+  tiles: {
     flexDirection: 'row',
+    gap: Spacing.three - 4,
+  },
+  tile: {
+    flex: 1,
+    padding: Spacing.three,
+    borderRadius: 24,
+    borderCurve: 'continuous',
+    gap: 2,
+  },
+  tileIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    borderCurve: 'continuous',
     alignItems: 'center',
-    gap: 4,
+    justifyContent: 'center',
   },
   row: {
     minHeight: 54,

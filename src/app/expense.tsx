@@ -83,9 +83,11 @@ function ExpenseForm({
   currency: string;
 }) {
   const theme = useTheme();
-  const [title, setTitle] = useState(existing?.title ?? '');
+  // Empty-state suggestions open this form with a title and category already filled in.
+  const preset = useLocalSearchParams<{ title?: string; category?: CategoryId }>();
+  const [title, setTitle] = useState(existing?.title ?? preset.title ?? '');
   const [amount, setAmount] = useState(existing ? String(existing.amount) : '');
-  const [category, setCategory] = useState<CategoryId>(existing?.category ?? 'food');
+  const [category, setCategory] = useState<CategoryId>(existing?.category ?? preset.category ?? 'food');
   const [date, setDate] = useState(existing?.date ?? todayKey());
   const [method, setMethod] = useState<PaymentMethod>(existing?.method ?? 'card');
   const [note, setNote] = useState(existing?.note ?? '');

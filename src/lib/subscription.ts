@@ -31,8 +31,24 @@ function setPro(value: boolean) {
   listeners.forEach((l) => l());
 }
 
+/**
+ * The app has a single paid tier, so any active entitlement or subscription unlocks Pro. This keeps
+ * purchases working even when the dashboard entitlement is named differently from ENTITLEMENT_ID
+ * or a Test Store product has not been attached to it yet.
+ */
+function hasPro(info: CustomerInfo) {
+  return (
+    info.entitlements.active[ENTITLEMENT_ID] !== undefined ||
+    Object.keys(info.entitlements.active).length > 0 ||
+    info.activeSubscriptions.length > 0
+  );
+}
+
 function applyCustomerInfo(info: CustomerInfo) {
-  setPro(info.entitlements.active[ENTITLEMENT_ID] !== undefined);
+  if (__DEV__) {
+    console.log('[purchases] entitlements:', Object.keys(info.entitlements.active), 'subscriptions:', info.activeSubscriptions);
+  }
+  setPro(hasPro(info));
 }
 
 /** Configures RevenueCat once per launch. Safe to call repeatedly. */
@@ -59,6 +75,17 @@ export async function identifyPurchaser(appUserID: string) {
   }
 }
 
+/** Detaches purchases from the signed-out account so the next sign-in starts clean. */
+export async function resetPurchaser() {
+  if (!supported || !configured) return;
+  try {
+    applyCustomerInfo(await Purchases.logOut());
+  } catch {
+    // Already anonymous; nothing to reset.
+  }
+  setPro(false);
+}
+
 export function useIsPro() {
   return useSyncExternalStore(
     (l) => {
@@ -83,14 +110,17 @@ export async function getCurrentOffering(): Promise<PurchasesOffering | null> {
   return offerings.current;
 }
 
-/** Resolves true on success, false if the user cancelled; throws on other errors. */
-export async function purchase(pkg: PurchasesPackage) {
+/**
+ * Resolves 'pro' when Pro is active afterwards, 'cancelled' if the user backed out, and
+ * 'inactive' when the store accepted the purchase but nothing was unlocked. Throws on other errors.
+ */
+export async function purchase(pkg: PurchasesPackage): Promise<'pro' | 'cancelled' | 'inactive'> {
   try {
     const { customerInfo } = await Purchases.purchasePackage(pkg);
     applyCustomerInfo(customerInfo);
-    return customerInfo.entitlements.active[ENTITLEMENT_ID] !== undefined;
+    return hasPro(customerInfo) ? 'pro' : 'inactive';
   } catch (error) {
-    if ((error as { code?: string }).code === PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR) return false;
+    if ((error as { code?: string }).code === PURCHASES_ERROR_CODE.PURCHASE_CANCELLED_ERROR) return 'cancelled';
     throw error;
   }
 }
@@ -99,7 +129,7 @@ export async function purchase(pkg: PurchasesPackage) {
 export async function restore() {
   const info = await Purchases.restorePurchases();
   applyCustomerInfo(info);
-  return info.entitlements.active[ENTITLEMENT_ID] !== undefined;
+  return hasPro(info);
 }
 
 export function manageSubscription() {

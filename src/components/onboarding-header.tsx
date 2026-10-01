@@ -1,7 +1,8 @@
 import { StyleSheet, View } from 'react-native';
 
+import { Icon, type IconName } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
-import { Spacing } from '@/constants/theme';
+import { Fonts, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 export function OnboardingHeader({
@@ -9,11 +10,13 @@ export function OnboardingHeader({
   total,
   title,
   subtitle,
+  icon,
 }: {
   step: number;
   total: number;
   title: string;
   subtitle: string;
+  icon?: IconName;
 }) {
   const theme = useTheme();
   return (
@@ -26,10 +29,19 @@ export function OnboardingHeader({
           />
         ))}
       </View>
-      <Text variant="overline" color="primaryInk">
-        Step {step} of {total}
-      </Text>
-      <Text variant="title" style={{ fontSize: 30, lineHeight: 36 }}>
+      <View style={styles.topRow}>
+        {icon && (
+          <View style={[styles.iconTile, { backgroundColor: theme.primary }]}>
+            <Icon name={icon} size={24} color={theme.onPrimary} />
+          </View>
+        )}
+        <View style={[styles.stepPill, { backgroundColor: theme.primarySoft }]}>
+          <Text style={[styles.stepText, { color: theme.primaryInk }]}>
+            STEP {step} OF {total}
+          </Text>
+        </View>
+      </View>
+      <Text variant="title" style={{ fontSize: 34, lineHeight: 40, letterSpacing: -0.8 }}>
         {title}
       </Text>
       <Text variant="body" color="textSecondary">
@@ -52,5 +64,30 @@ const styles = StyleSheet.create({
     flex: 1,
     height: 5,
     borderRadius: 3,
+  },
+  topRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.one,
+  },
+  iconTile: {
+    width: 54,
+    height: 54,
+    borderRadius: 18,
+    borderCurve: 'continuous',
+    alignItems: 'center',
+    justifyContent: 'center',
+    boxShadow: '0 8px 22px rgba(15,163,122,0.35)',
+  },
+  stepPill: {
+    borderRadius: Radius.pill,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+  },
+  stepText: {
+    fontFamily: Fonts.extrabold,
+    fontSize: 11,
+    letterSpacing: 1,
   },
 });

@@ -2,6 +2,7 @@ import { router } from 'expo-router';
 import { useMemo } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
+import { EmptyState } from '@/components/empty-state';
 import { Card } from '@/components/ui/card';
 import { Icon, Icons } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
@@ -36,6 +37,19 @@ export default function HistoryScreen() {
             {formatMoney(totalSaved, currency)}
           </Text>
         </Card>
+      )}
+
+      {cycles !== undefined && rows.length === 0 && (
+        <EmptyState
+          icon={Icons.history}
+          title="No salaries yet"
+          body="Each salary you log starts a cycle. Past cycles and how much you saved appear here."
+          suggestions={[
+            { label: 'Add salary', icon: Icons.salary, onPress: () => router.push('/salary') },
+            { label: 'Say it with voice', icon: Icons.mic, onPress: () => router.push('/assistant') },
+          ]}
+          suggestionsTitle="Get started"
+        />
       )}
 
       {rows.map((r, i) => (
