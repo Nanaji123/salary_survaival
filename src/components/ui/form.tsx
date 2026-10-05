@@ -204,7 +204,7 @@ export function CategoryGrid({
                 style={[
                   styles.categoryLabel,
                   { color: selected ? theme.text : theme.textSecondary },
-                  selected && { fontFamily: Fonts.bold },
+                  selected && { ...Fonts.bold },
                 ]}>
                 {c.label.split(' ')[0]}
               </Text>
@@ -245,7 +245,7 @@ export function MethodPicker({
               <Text
                 variant="caption"
                 numberOfLines={1}
-                style={{ fontFamily: Fonts.semibold, color: selected ? theme.background : theme.text }}>
+                style={{ ...Fonts.semibold, color: selected ? theme.background : theme.text }}>
                 {m.label}
               </Text>
             </Pressable>
@@ -366,7 +366,7 @@ export function Chip({
       }}
       style={[styles.chip, { backgroundColor: selected ? theme.text : theme.card }]}>
       {leading}
-      <Text variant="caption" style={{ fontFamily: Fonts.semibold, color: selected ? theme.background : theme.text }}>
+      <Text variant="caption" style={{ ...Fonts.semibold, color: selected ? theme.background : theme.text }}>
         {label}
       </Text>
     </Pressable>
@@ -414,7 +414,7 @@ export function PaydayPicker({ value, onChange }: { value: number; onChange: (d:
                 ]}>
                 <Text
                   variant="label"
-                  style={{ color: selected ? theme.onPrimary : theme.text, fontFamily: selected ? Fonts.bold : Fonts.medium }}>
+                  style={{ color: selected ? theme.onPrimary : theme.text, ...(selected ? Fonts.bold : Fonts.medium) }}>
                   {d}
                 </Text>
               </Pressable>
@@ -458,7 +458,7 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     paddingHorizontal: Spacing.three,
     fontSize: 16,
-    fontFamily: Fonts.medium,
+    ...Fonts.medium,
   },
   amountBox: {
     alignItems: 'center',
@@ -472,12 +472,12 @@ const styles = StyleSheet.create({
     gap: Spacing.one,
   },
   amountSymbol: {
-    fontFamily: Fonts.bold,
+    ...Fonts.bold,
     fontSize: 30,
     lineHeight: 40,
   },
   amountInput: {
-    fontFamily: Fonts.extrabold,
+    ...Fonts.extrabold,
     fontSize: 54,
     letterSpacing: -1.5,
     fontVariant: ['tabular-nums'],
@@ -562,7 +562,7 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: 15,
-    fontFamily: Fonts.medium,
+    ...Fonts.medium,
     padding: 0,
   },
   chip: {
@@ -597,17 +597,17 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   paydayBig: {
-    fontFamily: Fonts.extrabold,
+    ...Fonts.extrabold,
     fontSize: 30,
     lineHeight: 36,
     letterSpacing: -0.6,
   },
   paydaySuffix: {
-    fontFamily: Fonts.extrabold,
+    ...Fonts.extrabold,
     fontSize: 18,
   },
   paydayOf: {
-    fontFamily: Fonts.semibold,
+    ...Fonts.semibold,
     fontSize: 15,
     letterSpacing: 0,
   },

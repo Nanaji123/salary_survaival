@@ -1,6 +1,6 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Alert, Pressable, StyleSheet, View } from 'react-native';
 
 import { HeaderTextButton } from '@/components/header-button';
 import { Button } from '@/components/ui/button';
@@ -10,9 +10,12 @@ import { Text } from '@/components/ui/text';
 import { type CategoryId, type PaymentMethod } from '@/constants/categories';
 import { Fonts, Radius, Spacing } from '@/constants/theme';
 import { ProLock } from '@/components/pro-lock';
+import { EmojiImage } from '@/components/ui/emoji';
 import { useSubmit } from '@/hooks/use-submit';
 import { useTheme } from '@/hooks/use-theme';
 import { formatMoney, parseAmount, todayKey } from '@/lib/format';
+import { freeLeft, useUsage } from '@/lib/limits';
+import { FREE_LIMITS } from '@convex/plans';
 import { useIsPro } from '@/lib/subscription';
 import {
   currentCycle,
@@ -32,10 +35,10 @@ export default function ExpenseScreen() {
   const account = useAccount();
   const cycles = useCycles();
   const expenses = useExpenses();
-  const isPro = useIsPro();
+  const usage = useUsage();
 
-  // Adding expenses is a Pro feature; existing ones stay viewable and editable.
-  if (!id && isPro === false) {
+  // The free plan includes a few new expenses a day; existing ones stay viewable and editable.
+  if (!id && freeLeft('expense', usage) <= 0) {
     return (
       <>
         <Stack.Screen
@@ -45,14 +48,14 @@ export default function ExpenseScreen() {
           }}
         />
         <ProLock
-          title="Track every expense"
-          body="Upgrade to Pro to record expenses, see where your salary goes and get alerts before you overspend."
+          title="You’ve used your free adds"
+          body={`The free plan includes ${FREE_LIMITS.expense} expenses. Go Pro for unlimited tracking.`}
         />
       </>
     );
   }
 
-  if (!cycles || !expenses || (!id && isPro === undefined)) {
+  if (!cycles || !expenses) {
     return <ActivityIndicator color={theme.primary} style={{ marginTop: Spacing.six }} />;
   }
 
@@ -83,6 +86,8 @@ function ExpenseForm({
   currency: string;
 }) {
   const theme = useTheme();
+  const isPro = useIsPro();
+  const left = freeLeft('expense', useUsage());
   // Empty-state suggestions open this form with a title and category already filled in.
   const preset = useLocalSearchParams<{ title?: string; category?: CategoryId }>();
   const [title, setTitle] = useState(existing?.title ?? preset.title ?? '');
@@ -118,7 +123,10 @@ function ExpenseForm({
         note: note.trim() || undefined,
       }),
     );
-    if (ok) router.back();
+    if (!ok) return;
+    // Free users see the plans after every new expense.
+    if (!existing && isPro !== true) router.replace('/paywall');
+    else router.back();
   }
 
   function confirmDelete() {
@@ -146,6 +154,25 @@ function ExpenseForm({
         }}
       />
       <FormScroll>
+        {!existing && Number.isFinite(left) && (
+          <Pressable
+            accessibilityRole="button"
+            onPress={() => router.push('/paywall')}
+            style={({ pressed }) => [styles.free, { backgroundColor: theme.goldSoft, opacity: pressed ? 0.7 : 1 }]}>
+            <EmojiImage name="crown" size={22} />
+            <View style={{ flex: 1 }}>
+              <Text variant="label" style={{ fontSize: 13, ...Fonts.bold }}>
+                {left} of {FREE_LIMITS.expense} free adds left
+              </Text>
+              <Text variant="caption" color="textSecondary">
+                Go Pro for unlimited expenses and AI
+              </Text>
+            </View>
+            <Text variant="caption" style={{ ...Fonts.extrabold, color: theme.gold }}>
+              Upgrade
+            </Text>
+          </Pressable>
+        )}
         <AmountField
           label="Amount spent"
           value={amount}
@@ -157,7 +184,7 @@ function ExpenseForm({
               <View style={[styles.after, { backgroundColor: after < 0 ? theme.dangerSoft : theme.primarySoft }]}>
                 <Text
                   variant="caption"
-                  style={{ fontFamily: Fonts.semibold, color: after < 0 ? theme.danger : theme.primaryInk }}>
+                  style={{ ...Fonts.semibold, color: after < 0 ? theme.danger : theme.primaryInk }}>
                   {after < 0
                     ? `${formatMoney(-after, currency)} over your salary`
                     : `${formatMoney(after, currency)} left after this`}
@@ -202,6 +229,14 @@ function ExpenseForm({
 }
 
 const styles = StyleSheet.create({
+  free: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.three - 4,
+    padding: 12,
+    borderRadius: Radius.md,
+    borderCurve: 'continuous',
+  },
   after: {
     paddingHorizontal: 14,
     paddingVertical: 6,

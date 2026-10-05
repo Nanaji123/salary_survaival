@@ -1,0 +1,42 @@
+SHORT DESCRIPTION
+A daily spend limit that makes every salary last until your next payday.
+
+FULL DESCRIPTION
+Salary Survival helps you make each salary last until payday.
+
+Log your salary the day it lands and the app works out how much you can safely spend each day until the next one. Add expenses as you go and your daily limit updates straight away, so you always know where you stand.
+
+KNOW WHAT IS SAFE TO SPEND
+• A daily spend limit that adjusts as you spend
+• Days left until payday, always in view
+• Works in your currency, with every major world currency supported
+
+TRACK EXPENSES IN SECONDS
+• 16 categories, from Food & Dining to Bills & Utilities
+• Add a note and how you paid
+• Say it with voice: tell the app what you spent and it logs it for you
+
+SEE WHERE YOUR MONEY GOES
+• Charts for every category
+• Spending trends and month vs month comparisons
+• A spending calendar and your biggest expenses
+• Category budgets that warn you at 80% and when you go over
+
+PLAN AROUND PAYDAY
+• Payday reminders and an optional daily nudge to log your spending
+• Set a savings goal and track it every salary
+• Full history of past salaries and how each one went
+
+OPTIONAL AI HELP
+• An AI summary of what stood out in your spending
+• An AI salary plan that suggests how to split your next salary
+• AI only runs when you ask, and shows exactly what it will read first
+
+STAY MOTIVATED
+• Earn XP, level up, complete quests and keep your streak going
+• Unlock trophies as your habits improve
+
+PRIVATE BY DESIGN
+• No email or password: your account is linked to your device
+• No ads, we never sell your data and we don't track you
+• Delete everything any time from Settings

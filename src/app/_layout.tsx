@@ -13,13 +13,18 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 
 import { AnimatedSplash } from '@/components/splash';
+import { CelebrationHost } from '@/components/celebrations';
+import { PlanSync } from '@/components/plan-sync';
+import { ReminderSync } from '@/components/reminder-sync';
 import { Fonts } from '@/constants/theme';
 import { useColorScheme } from '@/hooks/use-color-scheme';
 import { useTheme } from '@/hooks/use-theme';
 import { convex, useAccount, useDeviceId } from '@/lib/store';
+import { configureNotifications } from '@/lib/reminders';
 import { configurePurchases } from '@/lib/subscription';
 
 SplashScreen.preventAutoHideAsync();
+configureNotifications();
 
 export default function RootLayout() {
   const [fontsLoaded] = useFonts({
@@ -100,7 +105,7 @@ function AppNavigator() {
       <Stack
         screenOptions={{
           headerTintColor: theme.text,
-          headerTitleStyle: { color: theme.text, fontFamily: Fonts.bold, fontSize: 17 },
+          headerTitleStyle: { color: theme.text, ...Fonts.bold, fontSize: 17 },
           headerShadowVisible: false,
           headerBackButtonDisplayMode: 'minimal',
           contentStyle: { backgroundColor: theme.background },
@@ -119,6 +124,8 @@ function AppNavigator() {
           <Stack.Screen name="expense" options={{ presentation: 'modal' }} />
           <Stack.Screen name="salary" options={{ presentation: 'modal' }} />
           <Stack.Screen name="edit-profile" options={{ presentation: 'modal', title: 'Profile' }} />
+          <Stack.Screen name="savings-goal" options={{ presentation: 'modal', title: 'Savings goal' }} />
+          <Stack.Screen name="reminders" options={{ presentation: 'modal', title: 'Reminders' }} />
           <Stack.Screen name="paywall" options={{ presentation: 'fullScreenModal', headerShown: false }} />
           <Stack.Screen name="assistant" options={{ presentation: 'fullScreenModal', headerShown: false }} />
           <Stack.Screen name="ai-plan" options={{ presentation: 'fullScreenModal', headerShown: false }} />
@@ -126,6 +133,9 @@ function AppNavigator() {
 
         <Stack.Screen name="currency" options={{ presentation: 'modal', title: 'Currency' }} />
       </Stack>
+      {onboarded && <CelebrationHost />}
+      {onboarded && <ReminderSync />}
+      {deviceId && <PlanSync />}
     </ThemeProvider>
   );
 }

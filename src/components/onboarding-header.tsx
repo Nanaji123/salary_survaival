@@ -86,7 +86,7 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
   },
   stepText: {
-    fontFamily: Fonts.extrabold,
+    ...Fonts.extrabold,
     fontSize: 11,
     letterSpacing: 1,
   },

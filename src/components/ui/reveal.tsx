@@ -1,7 +1,7 @@
-import Animated, { FadeInDown } from 'react-native-reanimated';
+import Animated, { Easing, FadeIn } from 'react-native-reanimated';
 import type { StyleProp, ViewStyle } from 'react-native';
 
-/** Fades and lifts its children in; stagger a list by passing an increasing `index`. */
+/** Fades its children in with a smooth ease (no spring); stagger a list by passing an increasing `index`. */
 export function Reveal({
   index = 0,
   style,
@@ -12,7 +12,11 @@ export function Reveal({
   children: React.ReactNode;
 }) {
   return (
-    <Animated.View entering={FadeInDown.delay(index * 70).duration(420).springify().damping(18)} style={style}>
+    <Animated.View
+      entering={FadeIn.delay(index * 60)
+        .duration(360)
+        .easing(Easing.out(Easing.cubic))}
+      style={style}>
       {children}
     </Animated.View>
   );

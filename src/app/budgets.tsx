@@ -206,7 +206,7 @@ function Budgets({
                     }}
                     hitSlop={8}
                     style={styles.maxButton}>
-                    <Text variant="caption" color="primaryInk" style={{ fontFamily: Fonts.bold }}>
+                    <Text variant="caption" color="primaryInk" style={{ ...Fonts.bold }}>
                       Use all available ({formatMoney(Math.floor(max), currency, { compact: true })})
                     </Text>
                   </Pressable>
@@ -242,7 +242,7 @@ function Legend({ color, label, value }: { color: string; label: string; value: 
         <Text variant="caption" style={{ color: 'rgba(255,255,255,0.6)', fontSize: 11 }}>
           {label}
         </Text>
-        <Text variant="label" style={{ color: '#FFFFFF', fontFamily: Fonts.bold }}>
+        <Text variant="label" style={{ color: '#FFFFFF', ...Fonts.bold }}>
           {value}
         </Text>
       </View>
@@ -292,7 +292,7 @@ const styles = StyleSheet.create({
   },
   inputText: {
     flex: 1,
-    fontFamily: Fonts.bold,
+    ...Fonts.bold,
     fontSize: 15,
     padding: 0,
     textAlign: 'right',

@@ -1,7 +1,9 @@
 import { ConvexError, v } from 'convex/values';
 
 import { mutation, query } from './_generated/server';
+import { awardExpenseXp, checkTrophies, localToday, recordActivity, setUpGame } from './gameEngine';
 import { findUser, requireUser, validateAmount, validateDate } from './lib';
+import { spendAllowance } from './usage';
 import { category, paymentMethod } from './schema';
 
 /** Every expense for the user, across all salary cycles. */
@@ -29,8 +31,10 @@ export const save = mutation({
     date: v.string(),
     method: v.optional(paymentMethod),
     note: v.optional(v.string()),
+    /** The app's local date, for streaks and daily XP. */
+    today: v.optional(v.string()),
   },
-  handler: async (ctx, { deviceId, id, ...fields }) => {
+  handler: async (ctx, { deviceId, id, today, ...fields }) => {
     const user = await requireUser(ctx, deviceId);
     const cycle = await ctx.db.get(fields.cycleId);
     if (!cycle || cycle.userId !== user._id) throw new ConvexError('Salary not found');
@@ -45,7 +49,17 @@ export const save = mutation({
       await ctx.db.patch(id, { ...fields, title });
       return id;
     }
-    return ctx.db.insert('expenses', { ...fields, title, userId: user._id });
+    // New expenses count towards the free plan's allowance (Pro is unlimited).
+    await spendAllowance(ctx, user, 'expense');
+    const day = localToday(today);
+    const newId = await ctx.db.insert('expenses', { ...fields, title, userId: user._id });
+
+    // Logging is what the game rewards: XP, the daily streak and any trophies it unlocks.
+    await setUpGame(ctx, user._id, day);
+    await awardExpenseXp(ctx, user._id, newId, day);
+    await recordActivity(ctx, user._id, day);
+    await checkTrophies(ctx, user._id, day);
+    return newId;
   },
 });
 

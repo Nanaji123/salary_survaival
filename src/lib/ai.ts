@@ -1,10 +1,12 @@
 import { api } from '@convex/_generated/api';
-import { ConvexError } from 'convex/values';
+import { router } from 'expo-router';
 
 import type { CategoryId, PaymentMethod } from '@/constants/categories';
 import { getCategory } from '@/constants/categories';
 import { cycleProgress } from '@/lib/analytics';
+import { AiConsentDeclined, requireAiConsent } from '@/lib/ai-consent';
 import { todayKey } from '@/lib/format';
+import { errorMessage, isLimitError } from '@/lib/limits';
 import { quickParse } from '@/lib/quick-parse';
 import {
   addCycle,
@@ -23,10 +25,14 @@ import {
 
 const requireDevice = getDeviceId;
 
-/** Turns a Convex error into a sentence that is safe to show to the user. */
+/**
+ * Turns a Convex error into a sentence that is safe to show to the user. When a free plan
+ * allowance is used up it also opens the plans.
+ */
 export function aiErrorMessage(error: unknown) {
-  if (error instanceof ConvexError) return String(error.data);
-  return 'Could not reach the assistant. Check your connection and try again.';
+  if (error instanceof AiConsentDeclined) return 'AI is off, so nothing was sent. Try again any time to turn it on.';
+  if (isLimitError(error)) router.push('/paywall');
+  return errorMessage(error, 'Could not reach the assistant. Check your connection and try again.');
 }
 
 export type Interpretation = {
@@ -44,6 +50,7 @@ export type SalaryPlan = {
 };
 
 export async function transcribeAudio(audio: string, mimeType: string) {
+  await requireAiConsent();
   return convex.action(api.ai.transcribe, { deviceId: requireDevice(), audio, mimeType });
 }
 
@@ -51,6 +58,7 @@ export async function interpretText(text: string) {
   // Simple entries like "coffee 120" are understood on the device, which saves an API call.
   const quick = quickParse(text);
   if (quick) return quick;
+  await requireAiConsent();
   return (await convex.action(api.ai.interpret, {
     deviceId: requireDevice(),
     text,
@@ -59,11 +67,13 @@ export async function interpretText(text: string) {
 }
 
 export async function summarizeCycle(facts: string) {
-  return convex.action(api.ai.summarize, { deviceId: requireDevice(), facts });
+  await requireAiConsent();
+  return convex.action(api.ai.summarize, { deviceId: requireDevice(), facts, today: todayKey() });
 }
 
 export async function planSalary(facts: string, salary: number) {
-  return (await convex.action(api.ai.plan, { deviceId: requireDevice(), facts, salary })) as SalaryPlan;
+  await requireAiConsent();
+  return (await convex.action(api.ai.plan, { deviceId: requireDevice(), facts, salary, today: todayKey() })) as SalaryPlan;
 }
 
 /** Compact description of the current cycle that is sent to the model. */

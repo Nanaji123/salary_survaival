@@ -19,64 +19,78 @@ export type TextProps = RNTextProps & {
   color?: ThemeColor;
 };
 
-export function Text({ variant = 'body', color = 'text', style, ...rest }: TextProps) {
+export function Text({ variant = 'body', color = 'text', style, maxFontSizeMultiplier = 1.3, ...rest }: TextProps) {
   const theme = useTheme();
-  return <RNText style={[styles[variant], { color: theme[color] }, style]} {...rest} />;
+  // A larger fontSize passed in `style` would otherwise keep the variant's line height and get
+  // its tops and bottoms clipped, so grow the line height to fit.
+  const flat = StyleSheet.flatten(style);
+  const base = styles[variant];
+  const fit =
+    flat?.fontSize && flat.lineHeight === undefined && flat.fontSize * 1.2 > base.lineHeight
+      ? { lineHeight: Math.round(flat.fontSize * 1.25) }
+      : null;
+  return (
+    <RNText
+      maxFontSizeMultiplier={maxFontSizeMultiplier}
+      style={[base, { color: theme[color] }, style, fit]}
+      {...rest}
+    />
+  );
 }
 
 const styles = StyleSheet.create({
   hero: {
-    fontFamily: Fonts.extrabold,
-    fontSize: 44,
-    lineHeight: 52,
-    letterSpacing: -1.2,
+    ...Fonts.extrabold,
+    fontSize: 36,
+    lineHeight: 42,
+    letterSpacing: -1,
     fontVariant: ['tabular-nums'],
   },
   display: {
-    fontFamily: Fonts.extrabold,
-    fontSize: 32,
-    lineHeight: 38,
-    letterSpacing: -0.8,
+    ...Fonts.extrabold,
+    fontSize: 26,
+    lineHeight: 32,
+    letterSpacing: -0.6,
     fontVariant: ['tabular-nums'],
   },
   title: {
-    fontFamily: Fonts.bold,
-    fontSize: 26,
-    lineHeight: 32,
-    letterSpacing: -0.5,
+    ...Fonts.bold,
+    fontSize: 22,
+    lineHeight: 28,
+    letterSpacing: -0.4,
   },
   headline: {
-    fontFamily: Fonts.bold,
-    fontSize: 17,
-    lineHeight: 22,
-    letterSpacing: -0.2,
-  },
-  body: {
-    fontFamily: Fonts.medium,
-    fontSize: 15,
-    lineHeight: 22,
-  },
-  label: {
-    fontFamily: Fonts.semibold,
+    ...Fonts.bold,
     fontSize: 15,
     lineHeight: 20,
+    letterSpacing: -0.15,
+  },
+  body: {
+    ...Fonts.medium,
+    fontSize: 14,
+    lineHeight: 20,
+  },
+  label: {
+    ...Fonts.semibold,
+    fontSize: 14,
+    lineHeight: 19,
   },
   caption: {
-    fontFamily: Fonts.medium,
-    fontSize: 13,
-    lineHeight: 18,
+    ...Fonts.medium,
+    fontSize: 12,
+    lineHeight: 16,
   },
   overline: {
-    fontFamily: Fonts.bold,
-    fontSize: 11,
-    lineHeight: 14,
-    letterSpacing: 1.1,
+    ...Fonts.bold,
+    fontSize: 10,
+    lineHeight: 13,
+    letterSpacing: 1,
     textTransform: 'uppercase',
   },
   money: {
-    fontFamily: Fonts.bold,
-    fontSize: 15,
-    lineHeight: 20,
+    ...Fonts.bold,
+    fontSize: 14,
+    lineHeight: 19,
     fontVariant: ['tabular-nums'],
   },
 });

@@ -12,7 +12,14 @@ import type * as ai from "../ai.js";
 import type * as budgets from "../budgets.js";
 import type * as cycles from "../cycles.js";
 import type * as expenses from "../expenses.js";
+import type * as game from "../game.js";
+import type * as gameEngine from "../gameEngine.js";
+import type * as gameRules from "../gameRules.js";
+import type * as http from "../http.js";
+import type * as legalPages from "../legalPages.js";
 import type * as lib from "../lib.js";
+import type * as plans from "../plans.js";
+import type * as usage from "../usage.js";
 import type * as users from "../users.js";
 
 import type {
@@ -26,7 +33,14 @@ declare const fullApi: ApiFromModules<{
   budgets: typeof budgets;
   cycles: typeof cycles;
   expenses: typeof expenses;
+  game: typeof game;
+  gameEngine: typeof gameEngine;
+  gameRules: typeof gameRules;
+  http: typeof http;
+  legalPages: typeof legalPages;
   lib: typeof lib;
+  plans: typeof plans;
+  usage: typeof usage;
   users: typeof users;
 }>;
 

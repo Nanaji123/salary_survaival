@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   figureValue: {
-    fontFamily: Fonts.bold,
+    ...Fonts.bold,
     fontVariant: ['tabular-nums'],
   },
 });

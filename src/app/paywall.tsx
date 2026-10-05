@@ -3,6 +3,7 @@ import { StatusBar } from 'expo-status-bar';
 import * as WebBrowser from 'expo-web-browser';
 import { useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
 import type { PurchasesOffering, PurchasesPackage } from 'react-native-purchases';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -10,17 +11,17 @@ import { tap } from '@/components/ui/form';
 import { Icon, Icons, type IconName } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { Fonts, MaxContentWidth, Radius, Spacing } from '@/constants/theme';
+import { PRIVACY_URL, TERMS_URL } from '@/constants/legal';
 import { getCurrentOffering, purchase, restore, useIsPro } from '@/lib/subscription';
 
 const INK = '#0E1116';
 const CARD = 'rgba(255,255,255,0.06)';
-const MINT = '#4BE3B0';
+const MINT = '#C6F45A';
 const MUTED = 'rgba(255,255,255,0.62)';
 
-/** Apple's standard EULA; replace if you publish your own terms. */
-const TERMS_URL = 'https://www.apple.com/legal/internet-services/itunes/dev/stdeula/';
-/** Required by App Store and Play review. Set this to your hosted privacy policy. */
-const PRIVACY_URL = '';
+
+/** The close button appears after this delay, so the offer gets a moment before it can be dismissed. */
+const CLOSE_DELAY_MS = 5000;
 
 const FEATURES: { icon: IconName; title: string }[] = [
   { icon: Icons.receipt, title: 'Unlimited expense tracking' },
@@ -138,6 +139,12 @@ export default function PaywallScreen() {
       .catch(() => setOffering(null));
   }, []);
 
+  const [canClose, setCanClose] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setCanClose(true), CLOSE_DELAY_MS);
+    return () => clearTimeout(t);
+  }, []);
+
   // Close automatically once a purchase or restore unlocks Pro.
   useEffect(() => {
     if (isPro) router.back();
@@ -202,7 +209,7 @@ export default function PaywallScreen() {
         styles.container,
         {
           experimental_backgroundImage:
-            'radial-gradient(circle at 90% 0%, rgba(75,227,176,0.24) 0%, transparent 45%), radial-gradient(circle at 0% 55%, rgba(91,91,214,0.14) 0%, transparent 40%)',
+            'radial-gradient(circle at 90% 0%, rgba(198,244,90,0.24) 0%, transparent 45%), radial-gradient(circle at 0% 55%, rgba(255,150,60,0.14) 0%, transparent 40%)',
         },
       ]}>
       <StatusBar style="light" />
@@ -216,14 +223,21 @@ export default function PaywallScreen() {
             <Icon name={Icons.sparkles} size={11} color={INK} />
             <Text style={styles.proBadgeText}>PRO</Text>
           </View>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Close"
-            hitSlop={12}
-            onPress={() => router.back()}
-            style={styles.close}>
-            <Icon name={Icons.close} size={14} color={MUTED} />
-          </Pressable>
+          {canClose ? (
+            <Animated.View entering={FadeIn.duration(400)}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close"
+                hitSlop={12}
+                onPress={() => router.back()}
+                style={styles.close}>
+                <Icon name={Icons.close} size={14} color={MUTED} />
+              </Pressable>
+            </Animated.View>
+          ) : (
+            // Keeps the header height steady until the button appears.
+            <View style={styles.closeSpace} />
+          )}
         </View>
 
         <View style={styles.hero}>
@@ -263,7 +277,7 @@ export default function PaywallScreen() {
                   }}
                   style={[
                     styles.plan,
-                    { borderColor: active ? MINT : 'rgba(255,255,255,0.1)', backgroundColor: active ? 'rgba(75,227,176,0.08)' : CARD },
+                    { borderColor: active ? MINT : 'rgba(255,255,255,0.1)', backgroundColor: active ? 'rgba(198,244,90,0.08)' : CARD },
                   ]}>
                   {p.savings && (
                     <View style={styles.save}>
@@ -420,10 +434,11 @@ const styles = StyleSheet.create({
   },
   proBadgeText: {
     color: INK,
-    fontFamily: Fonts.extrabold,
+    ...Fonts.extrabold,
     fontSize: 12,
     letterSpacing: 1,
   },
+  closeSpace: { width: 32, height: 32 },
   close: {
     width: 32,
     height: 32,
@@ -444,18 +459,18 @@ const styles = StyleSheet.create({
     backgroundColor: MINT,
     alignItems: 'center',
     justifyContent: 'center',
-    boxShadow: '0 10px 30px rgba(75,227,176,0.35)',
+    boxShadow: '0 10px 30px rgba(198,244,90,0.35)',
     marginBottom: Spacing.one,
   },
   kicker: {
     color: MINT,
-    fontFamily: Fonts.bold,
+    ...Fonts.bold,
     fontSize: 12,
     letterSpacing: 1.6,
   },
   title: {
     color: '#FFFFFF',
-    fontFamily: Fonts.extrabold,
+    ...Fonts.extrabold,
     fontSize: 32,
     lineHeight: 38,
     letterSpacing: -0.8,
@@ -480,7 +495,7 @@ const styles = StyleSheet.create({
   },
   featureText: {
     color: '#FFFFFF',
-    fontFamily: Fonts.semibold,
+    ...Fonts.semibold,
     fontSize: 15,
   },
   plan: {
@@ -504,7 +519,7 @@ const styles = StyleSheet.create({
   },
   saveText: {
     color: INK,
-    fontFamily: Fonts.extrabold,
+    ...Fonts.extrabold,
     fontSize: 11,
     letterSpacing: 0.6,
   },
@@ -524,28 +539,28 @@ const styles = StyleSheet.create({
   },
   planTitle: {
     color: '#FFFFFF',
-    fontFamily: Fonts.bold,
+    ...Fonts.bold,
     fontSize: 16,
   },
   planSub: {
     color: MUTED,
-    fontFamily: Fonts.medium,
+    ...Fonts.medium,
     fontSize: 12.5,
   },
   price: {
     color: '#FFFFFF',
-    fontFamily: Fonts.extrabold,
+    ...Fonts.extrabold,
     fontSize: 17,
     fontVariant: ['tabular-nums'],
   },
   period: {
     color: MUTED,
-    fontFamily: Fonts.medium,
+    ...Fonts.medium,
     fontSize: 12,
   },
   preview: {
     color: 'rgba(255,255,255,0.4)',
-    fontFamily: Fonts.medium,
+    ...Fonts.medium,
     fontSize: 11,
     textAlign: 'center',
   },
@@ -557,7 +572,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.two,
-    boxShadow: '0 12px 30px rgba(75,227,176,0.35)',
+    boxShadow: '0 12px 30px rgba(198,244,90,0.35)',
   },
   trialPill: {
     alignSelf: 'flex-start',
@@ -571,12 +586,12 @@ const styles = StyleSheet.create({
   },
   trialText: {
     color: INK,
-    fontFamily: Fonts.bold,
+    ...Fonts.bold,
     fontSize: 11,
   },
   compareAt: {
     color: 'rgba(255,255,255,0.4)',
-    fontFamily: Fonts.medium,
+    ...Fonts.medium,
     fontSize: 12,
     textDecorationLine: 'line-through',
   },
@@ -604,11 +619,11 @@ const styles = StyleSheet.create({
     flex: 1,
     width: 2,
     marginVertical: 4,
-    backgroundColor: 'rgba(75,227,176,0.4)',
+    backgroundColor: 'rgba(198,244,90,0.4)',
   },
   stepTitle: {
     color: '#FFFFFF',
-    fontFamily: Fonts.bold,
+    ...Fonts.bold,
     fontSize: 14,
     marginBottom: 2,
   },
@@ -620,17 +635,17 @@ const styles = StyleSheet.create({
   },
   assureText: {
     color: '#FFFFFF',
-    fontFamily: Fonts.semibold,
+    ...Fonts.semibold,
     fontSize: 13,
   },
   ctaText: {
     color: INK,
-    fontFamily: Fonts.bold,
+    ...Fonts.bold,
     fontSize: 17,
   },
   fine: {
     color: MUTED,
-    fontFamily: Fonts.medium,
+    ...Fonts.medium,
     fontSize: 12,
     lineHeight: 17,
     textAlign: 'center',
@@ -643,7 +658,7 @@ const styles = StyleSheet.create({
   },
   link: {
     color: 'rgba(255,255,255,0.8)',
-    fontFamily: Fonts.semibold,
+    ...Fonts.semibold,
     fontSize: 13,
   },
   dot: {

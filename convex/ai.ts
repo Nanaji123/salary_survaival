@@ -3,6 +3,8 @@ import { ConvexError, v } from 'convex/values';
 import { internal } from './_generated/api';
 import { action, internalMutation } from './_generated/server';
 import { findUser } from './lib';
+import type { Feature } from './plans';
+import { feature, refundAllowance, spendAllowance } from './usage';
 
 /**
  * AI helpers. The OpenAI key lives only in the Convex environment (OPENAI_API_KEY), never in the
@@ -37,12 +39,16 @@ const CATEGORIES = [
 
 const METHODS = ['cash', 'card', 'bank', 'wallet'] as const;
 
-/** Guards every action: only existing accounts can spend AI credits, up to a daily limit. */
+/**
+ * Guards every action: only existing accounts can spend AI credits, free users within their daily
+ * allowance for the feature, and everyone up to a hard daily cap.
+ */
 export const consume = internalMutation({
-  args: { deviceId: v.string() },
-  handler: async (ctx, { deviceId }) => {
+  args: { deviceId: v.string(), feature: v.optional(feature) },
+  handler: async (ctx, { deviceId, feature }) => {
     const user = await findUser(ctx, deviceId);
     if (!user) return null;
+    if (feature) await spendAllowance(ctx, user, feature);
     const day = new Date().toISOString().slice(0, 10);
     const usage = await ctx.db
       .query('aiUsage')
@@ -112,10 +118,33 @@ async function chatText(system: string, user: string) {
   return content.trim();
 }
 
-async function requireAccount(ctx: { runMutation: (...a: any[]) => Promise<any> }, deviceId: string) {
-  const user = await ctx.runMutation(internal.ai.consume, { deviceId });
+/** Gives back a free use when the AI request it paid for failed. */
+export const refund = internalMutation({
+  args: { deviceId: v.string(), feature },
+  handler: async (ctx, { deviceId, feature }) => {
+    const user = await findUser(ctx, deviceId);
+    if (user) await refundAllowance(ctx, user, feature);
+  },
+});
+
+type Ctx = { runMutation: (...a: any[]) => Promise<any> };
+
+async function requireAccount(ctx: Ctx, deviceId: string, feature?: Feature) {
+  // Fail before counting the request, so a missing key doesn't use up the daily limit.
+  apiKey();
+  const user = await ctx.runMutation(internal.ai.consume, { deviceId, feature });
   if (!user) throw new ConvexError('Account not found');
   return user as { name: string; currency: string };
+}
+
+/** Runs `work`, refunding the free use if it fails so a failed request doesn't cost the user. */
+async function refundOnFailure<T>(ctx: Ctx, deviceId: string, feature: Feature, work: () => Promise<T>) {
+  try {
+    return await work();
+  } catch (error) {
+    await ctx.runMutation(internal.ai.refund, { deviceId, feature });
+    throw error;
+  }
 }
 
 /** Speech to text for the hold-to-talk button. */
@@ -200,9 +229,9 @@ const interpretSchema = {
 export const interpret = action({
   args: { deviceId: v.string(), text: v.string(), today: v.string() },
   handler: async (ctx, { deviceId, text, today }) => {
-    const user = await requireAccount(ctx, deviceId);
     const input = text.trim().slice(0, 1500);
     if (!input) throw new ConvexError('Say or type something first.');
+    const user = await requireAccount(ctx, deviceId, 'assistant');
 
     const system = [
       'You turn a short message from a salary-tracking app user into structured data.',
@@ -217,7 +246,9 @@ export const interpret = action({
       '- reply: one short, friendly sentence, no markdown.',
     ].join('\n');
 
-    const result = await chatJson(system, input, 'interpretation', interpretSchema, 700);
+    const result = await refundOnFailure(ctx, deviceId, 'assistant', () =>
+      chatJson(system, input, 'interpretation', interpretSchema, 700),
+    );
 
     // Defensive clean-up: the app persists these values, so keep them sane.
     const clean = (n: unknown) => (typeof n === 'number' && Number.isFinite(n) && n > 0 && n < 1e12 ? n : null);
@@ -253,16 +284,17 @@ export const interpret = action({
 
 /** Plain-language summary of the current cycle. `facts` is a compact JSON blob built by the app. */
 export const summarize = action({
-  args: { deviceId: v.string(), facts: v.string() },
+  // `today` is accepted from the app but unused: free allowances don't reset daily.
+  args: { deviceId: v.string(), facts: v.string(), today: v.optional(v.string()) },
   handler: async (ctx, { deviceId, facts }) => {
-    const user = await requireAccount(ctx, deviceId);
+    const user = await requireAccount(ctx, deviceId, 'summary');
     const system = [
       `You are a warm, concise money coach inside a salary-tracking app. The user's name is ${user.name} and their currency is ${user.currency}.`,
       'Write a summary of their spending this salary cycle from the facts provided.',
       'Format: 3 to 4 short bullet lines, each starting with "• ". Cover: how they are doing overall, where most money went, one thing to watch, and one specific tip.',
       'Use the currency symbol with numbers. No markdown, no headings, no greetings. Under 90 words.',
     ].join('\n');
-    return chatText(system, facts.slice(0, 6000));
+    return refundOnFailure(ctx, deviceId, 'summary', () => chatText(system, facts.slice(0, 6000)));
   },
 });
 
@@ -291,10 +323,11 @@ const planSchema = {
 
 /** Suggests a savings goal and per-category budgets for a salary. */
 export const plan = action({
-  args: { deviceId: v.string(), facts: v.string(), salary: v.number() },
+  // `today` is accepted from the app but unused: free allowances don't reset daily.
+  args: { deviceId: v.string(), facts: v.string(), salary: v.number(), today: v.optional(v.string()) },
   handler: async (ctx, { deviceId, facts, salary }) => {
-    const user = await requireAccount(ctx, deviceId);
     if (!Number.isFinite(salary) || salary <= 0) throw new ConvexError('Add your salary first.');
+    const user = await requireAccount(ctx, deviceId, 'plan');
     const system = [
       `You are a practical budgeting coach. The user's currency is ${user.currency}.`,
       'Create a plan for one salary cycle. Use the 50/30/20 idea as a starting point but adapt to the user history in the facts.',
@@ -302,7 +335,9 @@ export const plan = action({
       `The savingsGoal plus the sum of all budget limits must be less than or equal to the salary of ${salary}.`,
       'Round limits to sensible numbers. The summary is two short friendly sentences, no markdown.',
     ].join('\n');
-    const result = await chatJson(system, `Salary: ${salary}\n${facts.slice(0, 6000)}`, 'salary_plan', planSchema, 700);
+    const result = await refundOnFailure(ctx, deviceId, 'plan', () =>
+      chatJson(system, `Salary: ${salary}\n${facts.slice(0, 6000)}`, 'salary_plan', planSchema, 700),
+    );
 
     let goal = Math.max(0, Math.round(Number(result.savingsGoal) || 0));
     let budgets = (result.budgets ?? [])

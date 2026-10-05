@@ -1,34 +1,34 @@
 import { router } from 'expo-router';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { AiSummaryCard } from '@/components/ai-summary-card';
-import { EmptyState, expenseSuggestions } from '@/components/empty-state';
+import { EmptyState } from '@/components/empty-state';
+import {
+  CategoryBreakdown,
+  InsightsHero,
+  SpendCalendar,
+  UnlockCard,
+  type Unlockable,
+} from '@/components/insight-cards';
 import { ScreenTitle, Section } from '@/components/section';
 import { TransactionRow } from '@/components/transaction-row';
 import { Card } from '@/components/ui/card';
-import { CategoryIcon } from '@/components/ui/category-icon';
-import {
-  BarChart,
-  Donut,
-  Gauge,
-  GroupedBars,
-  LegendDot,
-  ProgressBar,
-  StackedBar,
-  TrendChart,
-} from '@/components/ui/charts';
+import { BarChart, GroupedBars, LegendDot, StackedBar, TrendChart } from '@/components/ui/charts';
 import { Divider } from '@/components/ui/divider';
-import { Icon, Icons, type IconName } from '@/components/ui/icon';
+import { EmojiImage } from '@/components/ui/emoji';
+import { Icon, Icons } from '@/components/ui/icon';
 import { Reveal } from '@/components/ui/reveal';
 import { Text } from '@/components/ui/text';
 import { getCategory, PaymentMethods } from '@/constants/categories';
+import type { EmojiName } from '@/constants/emoji';
 import { Fonts, MaxContentWidth, Radius, Spacing, TabBarSpace } from '@/constants/theme';
+import { useTabTopInset } from '@/hooks/use-tab-top-inset';
 import { useTheme } from '@/hooks/use-theme';
 import {
   biggestExpense,
   cumulativeSpending,
+  cycleEnd,
   cycleHistory,
   cycleProgress,
   dailySpending,
@@ -40,35 +40,35 @@ import { formatMoney, fromDateKey } from '@/lib/format';
 import { currentCycle, summarize, useAccount, useBudgets, useCycles, useExpenses } from '@/lib/store';
 
 const METHOD_COLORS: Record<string, string> = {
-  cash: '#3E9A5C',
-  card: '#5B5BD6',
-  bank: '#2F8AC4',
-  wallet: '#E0703A',
+  cash: '#16A34A',
+  card: '#9333EA',
+  bank: '#E8A400',
+  wallet: '#EA580C',
 };
+
+const NOTE_EMOJI: Record<'good' | 'warn' | 'info', EmojiName> = { good: 'check', warn: 'warning', info: 'bulb' };
 
 export default function InsightsScreen() {
   const theme = useTheme();
-  const insets = useSafeAreaInsets();
+  const topInset = useTabTopInset();
   const account = useAccount();
   const currency = account?.currency ?? 'USD';
   const budgets = useBudgets();
   const cycles = useCycles();
   const expenses = useExpenses();
   const cycle = currentCycle(cycles);
+  const [trend, setTrend] = useState<'daily' | 'pace'>('daily');
 
   const data = useMemo(() => {
     if (!cycle || !cycles || !expenses) return null;
     const summary = summarize(cycle, expenses);
     const progress = cycleProgress(cycle);
-    const avg = summary.spent / Math.max(1, progress.elapsed);
     const weekdays = weekdaySpending(cycle, expenses);
     const busiest = weekdays.reduce((m, d) => (d.total > m.total ? d : m), weekdays[0]);
     return {
       summary,
       progress,
-      avg,
-      projected: avg * progress.total,
-      safePerDay: Math.max(0, summary.remaining) / progress.daysLeft,
+      projected: (summary.spent / Math.max(1, progress.elapsed)) * progress.total,
       daily: dailySpending(cycle, expenses),
       cumulative: cumulativeSpending(cycle, expenses),
       weekdays,
@@ -78,18 +78,29 @@ export default function InsightsScreen() {
       biggest: biggestExpense(cycle, expenses),
       top: summary.items.slice().sort((a, b) => b.amount - a.amount).slice(0, 3),
       notes: insights(cycle, expenses, cycles[1] ?? null),
+      activeDays: new Set(summary.items.map((e) => e.date)).size,
     };
   }, [cycle, cycles, expenses]);
 
   const compact = (v: number) => formatMoney(Math.round(v), currency, { compact: true });
 
+  // Charts that need more data than the user has yet, listed together in one checklist.
+  const locked: Unlockable[] = [];
+  if (data) {
+    if (data.summary.items.length < 3)
+      locked.push({ title: 'Spending trends', requirement: 'Log 3 expenses', have: data.summary.items.length, need: 3, emoji: 'rocket' });
+    if (data.activeDays < 3)
+      locked.push({ title: 'Your week', requirement: 'Log spending on 3 different days', have: data.activeDays, need: 3, emoji: 'sun' });
+    if (data.methods.length === 0)
+      locked.push({ title: 'How you pay', requirement: 'Pick Card, UPI, Cash or Wallet on an expense', have: 0, need: 1, emoji: 'banknote' });
+    if (data.history.length < 2)
+      locked.push({ title: 'Month vs month', requirement: 'Log your next salary', have: data.history.length, need: 2, emoji: 'scroll' });
+  }
+
   return (
     <ScrollView
       style={{ backgroundColor: theme.background }}
-      contentContainerStyle={[
-        styles.content,
-        { paddingTop: insets.top + Spacing.three, paddingBottom: TabBarSpace + insets.bottom },
-      ]}>
+      contentContainerStyle={[styles.content, { paddingTop: topInset + Spacing.three, paddingBottom: TabBarSpace }]}>
       <ScreenTitle eyebrow="Current salary cycle" title="Insights" />
 
       {!data || !cycle ? (
@@ -106,15 +117,15 @@ export default function InsightsScreen() {
         )
       ) : (
         <>
+          {/* Where you stand. */}
           <Reveal>
-            <Hero
-              spent={data.summary.spent}
+            <InsightsHero
               salary={cycle.amount}
-              ratio={data.summary.ratio}
-              avg={data.avg}
-              safePerDay={data.safePerDay}
-              projected={data.projected}
+              spent={data.summary.spent}
+              elapsed={data.progress.elapsed}
+              total={data.progress.total}
               daysLeft={data.progress.daysLeft}
+              receivedOn={cycle.receivedOn}
               currency={currency}
             />
           </Reveal>
@@ -123,141 +134,135 @@ export default function InsightsScreen() {
             <AiSummaryCard key={cycle._id} account={account} cycle={cycle} expenses={expenses ?? []} budgets={budgets ?? []} />
           </Reveal>
 
+          {/* Day by day. */}
           <Reveal index={2}>
-            <View style={styles.tiles}>
-              <StatTile icon={Icons.receipt} label="Transactions" value={String(data.summary.items.length)} />
-              <StatTile
-                icon={Icons.pie}
-                label="Top category"
-                value={data.summary.categories[0] ? getCategory(data.summary.categories[0].id).label : '—'}
+            <Section title="Spending calendar">
+              <SpendCalendar
+                receivedOn={cycle.receivedOn}
+                payday={cycleEnd(cycle)}
+                salary={cycle.amount}
+                totalDays={data.progress.total}
+                items={data.summary.items}
+                currency={currency}
               />
+            </Section>
+          </Reveal>
+
+          {/* Where it goes. */}
+          {data.summary.spent > 0 && (
+            <Reveal index={3}>
+              <Section title="Where it goes">
+                <CategoryBreakdown categories={data.summary.categories} spent={data.summary.spent} currency={currency} />
+              </Section>
+            </Reveal>
+          )}
+
+          {data.summary.items.length > 0 && (
+            <Reveal index={4} style={styles.tiles}>
               <StatTile
-                icon={Icons.trendUp}
+                emoji={data.biggest ? getCategory(data.biggest.category).emoji : 'zap'}
                 label="Biggest expense"
                 value={data.biggest ? formatMoney(data.biggest.amount, currency) : '—'}
                 caption={data.biggest?.title}
               />
-              <StatTile icon={Icons.calendar} label="Busiest day" value={data.busiest ? data.busiest.label : '—'} caption={data.busiest ? `${compact(data.busiest.total)} in total` : undefined} />
-            </View>
-          </Reveal>
+              <StatTile
+                emoji={data.summary.categories[0] ? getCategory(data.summary.categories[0].id).emoji : 'package'}
+                label="Top category"
+                value={data.summary.categories[0] ? getCategory(data.summary.categories[0].id).label : '—'}
+                caption={
+                  data.summary.categories[0]
+                    ? `${Math.round((data.summary.categories[0].amount / data.summary.spent) * 100)}% of spending`
+                    : undefined
+                }
+              />
+              <StatTile
+                emoji="ledger"
+                label="Expenses"
+                value={String(data.summary.items.length)}
+                caption={`on ${data.activeDays} ${data.activeDays === 1 ? 'day' : 'days'}`}
+              />
+              <StatTile
+                emoji="sun"
+                label="Busiest day"
+                value={data.busiest ? data.busiest.label : '—'}
+                caption={data.busiest ? `${compact(data.busiest.total)} in total` : undefined}
+              />
+            </Reveal>
+          )}
 
-          {data.summary.spent > 0 && (
-            <Reveal index={3}>
-              <Section title="Spending pace">
-                <Card style={{ gap: Spacing.three }}>
-                  <TrendChart
-                    points={data.cumulative}
-                    totalDays={data.progress.total}
-                    limit={cycle.amount}
-                    color={data.projected > cycle.amount ? theme.danger : theme.primary}
-                    paceColor={theme.textTertiary}
-                    gridColor={theme.border}
-                    labelColor={theme.textTertiary}
-                    formatValue={compact}
-                  />
-                  <View style={styles.legendInline}>
-                    <LegendDot color={data.projected > cycle.amount ? theme.danger : theme.primary} />
-                    <Text variant="caption" color="textSecondary">
-                      Your spending
-                    </Text>
-                    <View style={[styles.dash, { borderColor: theme.textTertiary }]} />
-                    <Text variant="caption" color="textSecondary">
-                      Even pace to payday
-                    </Text>
+          {/* Trends, once there is enough to draw. */}
+          {data.summary.items.length >= 3 && (
+            <Reveal index={5}>
+              <Section title="Trends">
+                <Card style={{ gap: Spacing.three, padding: Spacing.three }}>
+                  <View style={[styles.segment, { backgroundColor: theme.cardAlt }]}>
+                    {(['daily', 'pace'] as const).map((t) => (
+                      <Pressable
+                        key={t}
+                        accessibilityRole="tab"
+                        accessibilityState={{ selected: trend === t }}
+                        onPress={() => setTrend(t)}
+                        style={[styles.segmentItem, trend === t && { backgroundColor: theme.card, boxShadow: `0 1px 3px ${theme.shadow}` }]}>
+                        <Text variant="caption" style={{ ...Fonts.bold, color: trend === t ? theme.text : theme.textSecondary }}>
+                          {t === 'daily' ? 'Daily spending' : 'Pace to payday'}
+                        </Text>
+                      </Pressable>
+                    ))}
                   </View>
+                  {trend === 'daily' ? (
+                    <BarChart
+                      data={data.daily.map((d) => ({ label: String(fromDateKey(d.date).getDate()), value: d.amount }))}
+                      color={theme.primary}
+                      highlightIndex={data.daily.length - 1}
+                      highlightColor={theme.text}
+                      formatValue={compact}
+                      maxLabels={7}
+                    />
+                  ) : (
+                    <>
+                      <TrendChart
+                        points={data.cumulative}
+                        totalDays={data.progress.total}
+                        limit={cycle.amount}
+                        color={data.projected > cycle.amount ? theme.danger : theme.primary}
+                        paceColor={theme.textTertiary}
+                        gridColor={theme.border}
+                        labelColor={theme.textTertiary}
+                        formatValue={compact}
+                      />
+                      <View style={styles.legendInline}>
+                        <LegendDot color={data.projected > cycle.amount ? theme.danger : theme.primary} />
+                        <Text variant="caption" color="textSecondary">
+                          Your spending
+                        </Text>
+                        <View style={[styles.dash, { borderColor: theme.textTertiary }]} />
+                        <Text variant="caption" color="textSecondary">
+                          Even pace
+                        </Text>
+                      </View>
+                    </>
+                  )}
                 </Card>
               </Section>
             </Reveal>
           )}
 
-          <Reveal index={4}>
-            <Section title="Daily spending">
-              <Card>
-                <BarChart
-                  data={data.daily.map((d) => ({ label: String(fromDateKey(d.date).getDate()), value: d.amount }))}
-                  color={theme.primary}
-                  highlightIndex={data.daily.length - 1}
-                  highlightColor={theme.text}
-                  formatValue={compact}
-                  maxLabels={7}
-                />
-              </Card>
-            </Section>
-          </Reveal>
-
-          <Reveal index={5}>
-            <Section title="By category">
-              <Card style={{ gap: Spacing.four }}>
-                {data.summary.spent > 0 ? (
-                  <>
-                    <View style={{ alignItems: 'center' }}>
-                      <Donut
-                        segments={data.summary.categories.map((c) => ({
-                          key: c.id,
-                          value: c.amount,
-                          color: getCategory(c.id).color,
-                        }))}>
-                        <Text variant="caption" color="textSecondary">
-                          Total spent
-                        </Text>
-                        <Text variant="headline" numberOfLines={1} adjustsFontSizeToFit style={{ maxWidth: 110 }}>
-                          {formatMoney(data.summary.spent, currency)}
-                        </Text>
-                      </Donut>
-                    </View>
-                    <View style={{ gap: Spacing.three }}>
-                      {data.summary.categories.map((c) => {
-                        const cat = getCategory(c.id);
-                        const share = c.amount / data.summary.spent;
-                        return (
-                          <View key={c.id} style={{ gap: 6 }}>
-                            <View style={styles.legendRow}>
-                              <CategoryIcon id={c.id} size={30} />
-                              <Text variant="label" style={{ flex: 1 }} numberOfLines={1}>
-                                {cat.label}
-                              </Text>
-                              <Text variant="caption" color="textSecondary" style={styles.percent}>
-                                {Math.round(share * 100)}%
-                              </Text>
-                              <Text variant="money" style={styles.legendAmount}>
-                                {formatMoney(c.amount, currency)}
-                              </Text>
-                            </View>
-                            <ProgressBar value={share} color={cat.color} height={5} />
-                          </View>
-                        );
-                      })}
-                    </View>
-                  </>
-                ) : (
-                  <EmptyState
-                    icon={Icons.pie}
-                    title="No spending yet"
-                    body="Your category breakdown shows up after your first expense."
-                    suggestions={expenseSuggestions().slice(0, 3)}
-                    suggestionsTitle="Quick add"
-                  />
-                )}
-              </Card>
-            </Section>
-          </Reveal>
-
-          {data.summary.spent > 0 && (
+          {data.activeDays >= 3 && (
             <Reveal index={6}>
               <Section title="Your week">
-                <Card style={{ gap: Spacing.three }}>
+                <Card style={{ gap: Spacing.three, padding: Spacing.three }}>
                   <BarChart
                     data={data.weekdays.map((d) => ({ label: d.label, value: d.average }))}
-                    color={theme.primary}
+                    color={theme.gold}
                     highlightIndex={data.busiest ? data.weekdays.findIndex((d) => d.label === data.busiest!.label) : undefined}
-                    highlightColor={theme.text}
+                    highlightColor={theme.fire}
                     formatValue={compact}
                     maxLabels={7}
                     height={120}
                   />
                   <Text variant="caption" color="textSecondary">
                     {data.busiest
-                      ? `Average per day. ${data.busiest.label} is where most of your money goes.`
+                      ? `Average per day. ${data.busiest.label} is your biggest spending day.`
                       : 'Average spend per weekday.'}
                   </Text>
                 </Card>
@@ -268,8 +273,14 @@ export default function InsightsScreen() {
           {data.methods.length > 0 && (
             <Reveal index={7}>
               <Section title="How you pay">
-                <Card style={{ gap: Spacing.three }}>
-                  <StackedBar segments={data.methods.map((m) => ({ key: m.method, value: m.amount, color: METHOD_COLORS[m.method] ?? theme.textTertiary }))} />
+                <Card style={{ gap: Spacing.three, padding: Spacing.three }}>
+                  <StackedBar
+                    segments={data.methods.map((m) => ({
+                      key: m.method,
+                      value: m.amount,
+                      color: METHOD_COLORS[m.method] ?? theme.textTertiary,
+                    }))}
+                  />
                   <View style={{ gap: Spacing.two + 2 }}>
                     {data.methods.map((m) => {
                       const method = PaymentMethods.find((x) => x.id === m.method);
@@ -290,25 +301,10 @@ export default function InsightsScreen() {
             </Reveal>
           )}
 
-          {data.top.length > 0 && (
-            <Reveal index={8}>
-              <Section title="Biggest expenses">
-                <Card style={{ paddingVertical: Spacing.one }}>
-                  {data.top.map((e, i) => (
-                    <View key={e._id}>
-                      {i > 0 && <Divider inset={58} />}
-                      <TransactionRow expense={e} currency={currency} />
-                    </View>
-                  ))}
-                </Card>
-              </Section>
-            </Reveal>
-          )}
-
           {data.history.length > 1 && (
-            <Reveal index={9}>
-              <Section title="Salary cycles">
-                <Card style={{ gap: Spacing.three }}>
+            <Reveal index={8}>
+              <Section title="Month vs month">
+                <Card style={{ gap: Spacing.three, padding: Spacing.three }}>
                   <View style={styles.legendInline}>
                     <LegendDot color={theme.text} />
                     <Text variant="caption" color="textSecondary">
@@ -328,40 +324,56 @@ export default function InsightsScreen() {
             </Reveal>
           )}
 
-          {data.notes.length > 0 && (
-            <Reveal index={10}>
-              <Section title="What we noticed">
-                <View style={{ gap: Spacing.two }}>
-                  {data.notes.map((n, i) => {
-                    const tone =
-                      n.tone === 'good'
-                        ? { bg: theme.primarySoft, fg: theme.primaryInk, icon: Icons.checkCircle }
-                        : n.tone === 'warn'
-                          ? { bg: theme.warningSoft, fg: theme.warning, icon: Icons.alert }
-                          : { bg: theme.card, fg: theme.textSecondary, icon: Icons.bulb };
-                    return (
-                      <View key={i} style={[styles.note, { backgroundColor: tone.bg }]}>
-                        <Icon name={tone.icon} size={16} color={tone.fg} />
-                        <Text variant="body" style={{ flex: 1 }}>
-                          {n.text}
-                        </Text>
-                      </View>
-                    );
-                  })}
-                </View>
-              </Section>
+          {/* What's still locked. */}
+          {locked.length > 0 && (
+            <Reveal index={9}>
+              <UnlockCard items={locked} />
             </Reveal>
+          )}
+
+          {/* Takeaways. */}
+          {data.notes.length > 0 && (
+            <Section title="What we noticed">
+              <Card style={{ gap: Spacing.three, padding: Spacing.three }}>
+                {data.notes.map((n, i) => (
+                  <View key={i} style={{ gap: Spacing.three }}>
+                    {i > 0 && <Divider inset={36} />}
+                    <View style={styles.note}>
+                      <EmojiImage name={NOTE_EMOJI[n.tone]} size={24} />
+                      <Text variant="body" style={{ flex: 1 }}>
+                        {n.text}
+                      </Text>
+                    </View>
+                  </View>
+                ))}
+              </Card>
+            </Section>
+          )}
+
+          {data.top.length > 0 && (
+            <Section title="Biggest expenses">
+              <Card style={{ paddingVertical: Spacing.one, paddingHorizontal: Spacing.three }}>
+                {data.top.map((e, i) => (
+                  <View key={e._id}>
+                    {i > 0 && <Divider inset={58} />}
+                    <TransactionRow expense={e} currency={currency} />
+                  </View>
+                ))}
+              </Card>
+            </Section>
           )}
 
           <Pressable
             accessibilityRole="button"
             onPress={() => router.push('/ai-plan')}
             style={({ pressed }) => [styles.planRow, { backgroundColor: theme.card, opacity: pressed ? 0.7 : 1 }]}>
-            <View style={[styles.tileIcon, { backgroundColor: theme.primarySoft, marginBottom: 0 }]}>
-              <Icon name={Icons.wand} size={15} color={theme.primaryInk} />
+            <View style={[styles.planIcon, { backgroundColor: theme.primarySoft }]}>
+              <EmojiImage name="crystalBall" size={26} />
             </View>
             <View style={{ flex: 1 }}>
-              <Text variant="label">Plan my salary with AI</Text>
+              <Text variant="label" style={Fonts.bold}>
+                Plan my salary with AI
+              </Text>
               <Text variant="caption" color="textSecondary">
                 Get a savings goal and budgets in one tap
               </Text>
@@ -374,106 +386,12 @@ export default function InsightsScreen() {
   );
 }
 
-/** Dark summary card: how much of the salary is gone, and whether the pace will last to payday. */
-function Hero({
-  spent,
-  salary,
-  ratio,
-  avg,
-  safePerDay,
-  projected,
-  daysLeft,
-  currency,
-}: {
-  spent: number;
-  salary: number;
-  ratio: number;
-  avg: number;
-  safePerDay: number;
-  projected: number;
-  daysLeft: number;
-  currency: string;
-}) {
-  const theme = useTheme();
-  const over = spent > salary;
-  const pace = spent === 0 ? 'ok' : over ? 'over' : projected > salary ? 'fast' : 'ok';
-  const status = {
-    ok: { label: spent === 0 ? 'No spending yet' : 'On track', color: theme.heroAccent },
-    fast: { label: 'Spending fast', color: '#FFB84D' },
-    over: { label: 'Over salary', color: theme.danger },
-  }[pace];
-
-  return (
-    <View
-      style={[
-        styles.hero,
-        {
-          backgroundColor: theme.hero,
-          experimental_backgroundImage:
-            'radial-gradient(circle at 100% 0%, rgba(75,227,176,0.28) 0%, transparent 55%), radial-gradient(circle at 0% 100%, rgba(91,91,214,0.2) 0%, transparent 50%)',
-        },
-      ]}>
-      <View style={styles.heroTop}>
-        <Text variant="overline" style={{ color: theme.heroMuted }}>
-          Spent this cycle
-        </Text>
-        <View style={[styles.statusPill, { backgroundColor: 'rgba(255,255,255,0.1)' }]}>
-          <View style={[styles.statusDot, { backgroundColor: status.color }]} />
-          <Text variant="caption" style={{ color: '#FFFFFF', fontFamily: Fonts.semibold }}>
-            {status.label}
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.gaugeWrap}>
-        <Gauge value={ratio} size={230} stroke={16} color={over ? theme.danger : theme.heroAccent} track="rgba(255,255,255,0.12)" />
-        <View style={styles.gaugeCenter}>
-          <Text variant="display" style={{ color: theme.heroText, fontSize: 34, lineHeight: 40 }} numberOfLines={1} adjustsFontSizeToFit>
-            {formatMoney(spent, currency)}
-          </Text>
-          <Text variant="caption" style={{ color: theme.heroMuted }}>
-            of {formatMoney(salary, currency)} · {Math.round(Math.min(ratio, 9.99) * 100)}%
-          </Text>
-        </View>
-      </View>
-
-      <View style={styles.heroStats}>
-        <HeroStat label="Average / day" value={formatMoney(Math.round(avg), currency, { compact: true })} />
-        <View style={styles.heroDivider} />
-        <HeroStat label="Safe / day" value={formatMoney(Math.round(safePerDay), currency, { compact: true })} accent={theme.heroAccent} />
-        <View style={styles.heroDivider} />
-        <HeroStat
-          label="Projected"
-          value={formatMoney(Math.round(projected), currency, { compact: true })}
-          accent={projected > salary ? '#FFB84D' : undefined}
-        />
-      </View>
-      <Text variant="caption" style={{ color: theme.heroMuted, textAlign: 'center' }}>
-        {daysLeft} {daysLeft === 1 ? 'day' : 'days'} until payday
-      </Text>
-    </View>
-  );
-}
-
-function HeroStat({ label, value, accent }: { label: string; value: string; accent?: string }) {
-  return (
-    <View style={{ flex: 1, alignItems: 'center', gap: 2 }}>
-      <Text variant="caption" style={{ color: 'rgba(255,255,255,0.55)', fontSize: 11 }}>
-        {label}
-      </Text>
-      <Text variant="headline" style={{ color: accent ?? '#FFFFFF' }} numberOfLines={1} adjustsFontSizeToFit>
-        {value}
-      </Text>
-    </View>
-  );
-}
-
-function StatTile({ icon, label, value, caption }: { icon: IconName; label: string; value: string; caption?: string }) {
+function StatTile({ emoji, label, value, caption }: { emoji: EmojiName; label: string; value: string; caption?: string }) {
   const theme = useTheme();
   return (
     <Card style={styles.tile}>
       <View style={[styles.tileIcon, { backgroundColor: theme.cardAlt }]}>
-        <Icon name={icon} size={15} color={theme.text} />
+        <EmojiImage name={emoji} size={22} />
       </View>
       <Text variant="caption" color="textSecondary">
         {label}
@@ -481,8 +399,8 @@ function StatTile({ icon, label, value, caption }: { icon: IconName; label: stri
       <Text variant="headline" numberOfLines={1} adjustsFontSizeToFit>
         {value}
       </Text>
-      {caption && (
-        <Text variant="caption" color="textTertiary" numberOfLines={1} style={{ fontSize: 12 }}>
+      {!!caption && (
+        <Text variant="caption" color="textTertiary" numberOfLines={1} style={{ fontSize: 11 }}>
           {caption}
         </Text>
       )}
@@ -498,84 +416,23 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.gutter,
     gap: Spacing.four,
   },
-  hero: {
-    borderRadius: Radius.xl,
-    borderCurve: 'continuous',
-    padding: Spacing.gutter,
-    gap: Spacing.three,
-  },
-  heroTop: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  statusPill: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    borderRadius: Radius.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 5,
-  },
-  statusDot: { width: 7, height: 7, borderRadius: 4 },
-  gaugeWrap: { alignItems: 'center', height: 138, justifyContent: 'flex-end' },
-  gaugeCenter: { position: 'absolute', bottom: 2, alignItems: 'center', width: 170 },
-  heroStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.07)',
-    borderRadius: Radius.md,
-    paddingVertical: 12,
-  },
-  heroDivider: { width: StyleSheet.hairlineWidth, height: 28, backgroundColor: 'rgba(255,255,255,0.2)' },
-  tiles: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: Spacing.three - 4,
-  },
-  tile: {
-    width: '48%',
-    flexGrow: 1,
-    gap: 4,
-    padding: Spacing.three,
-  },
+  tiles: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.three - 4 },
+  tile: { width: '48%', flexGrow: 1, gap: 3, padding: Spacing.three },
   tileIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 10,
+    width: 38,
+    height: 38,
+    borderRadius: 12,
+    borderCurve: 'continuous',
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: Spacing.one,
   },
-  legendRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  percent: {
-    width: 38,
-    textAlign: 'right',
-    fontFamily: Fonts.semibold,
-  },
-  legendAmount: {
-    minWidth: 84,
-    textAlign: 'right',
-  },
-  legendInline: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  dash: {
-    width: 18,
-    height: 0,
-    borderTopWidth: 1.5,
-    borderStyle: 'dashed',
-    marginLeft: Spacing.two,
-  },
-  note: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing.three - 4,
-    padding: Spacing.three,
-    borderRadius: Radius.md,
-  },
+  segment: { flexDirection: 'row', borderRadius: Radius.pill, padding: 3 },
+  segmentItem: { flex: 1, alignItems: 'center', paddingVertical: 8, borderRadius: Radius.pill },
+  legendRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  legendInline: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  dash: { width: 18, height: 0, borderTopWidth: 1.5, borderStyle: 'dashed', marginLeft: Spacing.two },
+  note: { flexDirection: 'row', alignItems: 'flex-start', gap: Spacing.three - 4 },
   planRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -583,5 +440,13 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
     borderRadius: Radius.lg,
     borderCurve: 'continuous',
+  },
+  planIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 14,
+    borderCurve: 'continuous',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

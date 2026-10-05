@@ -34,7 +34,7 @@ export function BalanceHero({
         styles.card,
         {
           backgroundColor: theme.hero,
-          experimental_backgroundImage: `radial-gradient(circle at 100% 0%, ${overspent ? 'rgba(255,110,100,0.28)' : 'rgba(75,227,176,0.22)'} 0%, transparent 55%), linear-gradient(160deg, ${theme.heroAlt}, ${theme.hero})`,
+          experimental_backgroundImage: `radial-gradient(circle at 100% 0%, ${overspent ? 'rgba(255,110,100,0.28)' : 'rgba(198,244,90,0.22)'} 0%, transparent 55%), linear-gradient(160deg, ${theme.heroAlt}, ${theme.hero})`,
         },
       ]}>
       <View style={styles.top}>
@@ -134,12 +134,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   gaugeValue: {
-    fontFamily: Fonts.extrabold,
+    ...Fonts.extrabold,
     fontSize: 17,
     lineHeight: 20,
   },
   gaugeCaption: {
-    fontFamily: Fonts.medium,
+    ...Fonts.medium,
     fontSize: 10,
     lineHeight: 12,
   },

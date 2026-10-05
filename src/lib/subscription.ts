@@ -18,15 +18,23 @@ const API_KEY =
     android: process.env.EXPO_PUBLIC_REVENUECAT_ANDROID_KEY,
   }) || process.env.EXPO_PUBLIC_REVENUECAT_API_KEY;
 
-const supported = (Platform.OS === 'ios' || Platform.OS === 'android') && !!API_KEY;
+/**
+ * Subscriptions are switched on per build with EXPO_PUBLIC_SUBSCRIPTIONS_ENABLED=true, once the
+ * products exist in App Store Connect, Play Console and RevenueCat. Until then everyone gets the
+ * full app, no paywall is shown and RevenueCat is never configured, so store review never meets a
+ * purchase flow that can't complete.
+ */
+export const subscriptionsEnabled = process.env.EXPO_PUBLIC_SUBSCRIPTIONS_ENABLED === 'true';
+
+const supported = subscriptionsEnabled && (Platform.OS === 'ios' || Platform.OS === 'android') && !!API_KEY;
 
 // Subscription state: `undefined` while loading, then whether the user has Pro.
-let isPro: boolean | undefined = supported ? undefined : false;
+let isPro: boolean | undefined = !subscriptionsEnabled ? true : supported ? undefined : false;
 let configured = false;
 const listeners = new Set<() => void>();
 
 function setPro(value: boolean) {
-  if (value === isPro) return;
+  if (!subscriptionsEnabled || value === isPro) return;
   isPro = value;
   listeners.forEach((l) => l());
 }
@@ -95,6 +103,11 @@ export function useIsPro() {
     () => isPro,
     () => isPro,
   );
+}
+
+/** Pro state outside React; false while still loading. */
+export function currentlyPro() {
+  return isPro === true;
 }
 
 /** Returns true when the user has Pro; otherwise opens the paywall. */

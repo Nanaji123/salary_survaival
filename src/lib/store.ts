@@ -1,12 +1,16 @@
 import { api } from '@convex/_generated/api';
 import type { Doc, Id } from '@convex/_generated/dataModel';
-import { ConvexReactClient, useQuery } from 'convex/react';
+import { ConvexReactClient, useQueries, useQuery } from 'convex/react';
+import type { FunctionReturnType } from 'convex/server';
 import * as Application from 'expo-application';
 import Storage from 'expo-sqlite/kv-store';
-import { useSyncExternalStore } from 'react';
+import { useMemo, useSyncExternalStore } from 'react';
 import { Platform } from 'react-native';
 
+import type { QuestId } from '@convex/gameRules';
+
 import type { CategoryId, PaymentMethod } from '@/constants/categories';
+import { todayKey } from '@/lib/format';
 import { identifyPurchaser, resetPurchaser } from '@/lib/subscription';
 
 export type Account = Doc<'users'>;
@@ -117,6 +121,27 @@ export function useBudgets() {
   return useQuery(api.budgets.list, id ? { deviceId: id } : 'skip');
 }
 
+/**
+ * XP, streak, trophies and today's claimed quests, stored on the backend. Returns `undefined` while
+ * loading and `null` when unavailable. Unlike useQuery it never throws: a failing game backend only
+ * hides the game cards instead of taking down Home.
+ */
+export function useGameProgress(): FunctionReturnType<typeof api.game.get> | undefined {
+  const id = useDeviceId();
+  const today = todayKey();
+  const queries = useMemo(
+    (): Parameters<typeof useQueries>[0] =>
+      id ? { game: { query: api.game.get, args: { deviceId: id, today } } } : {},
+    [id, today],
+  );
+  const result = useQueries(queries).game;
+  if (result instanceof Error) {
+    console.warn('Game progress unavailable:', result.message);
+    return null;
+  }
+  return result;
+}
+
 // Mutations.
 
 export function updateAccount(patch: {
@@ -126,13 +151,13 @@ export function updateAccount(patch: {
   payday?: number;
   savingsGoal?: number;
 }) {
-  return convex.mutation(api.users.update, { deviceId: requireDeviceId(), ...patch });
+  return convex.mutation(api.users.update, { deviceId: requireDeviceId(), ...patch, today: todayKey() });
 }
 
 type CycleInput = { amount: number; receivedOn: string; note?: string };
 
 export function addCycle(input: CycleInput) {
-  return convex.mutation(api.cycles.add, { deviceId: requireDeviceId(), ...input });
+  return convex.mutation(api.cycles.add, { deviceId: requireDeviceId(), ...input, today: todayKey() });
 }
 
 export function updateCycle(id: CycleId, input: CycleInput) {
@@ -149,7 +174,7 @@ export function saveExpense(expense: {
   method?: PaymentMethod;
   note?: string;
 }) {
-  return convex.mutation(api.expenses.save, { deviceId: requireDeviceId(), ...expense });
+  return convex.mutation(api.expenses.save, { deviceId: requireDeviceId(), ...expense, today: todayKey() });
 }
 
 export function deleteExpense(id: ExpenseId) {
@@ -157,7 +182,38 @@ export function deleteExpense(id: ExpenseId) {
 }
 
 export function setBudget(category: CategoryId, limit: number) {
-  return convex.mutation(api.budgets.set, { deviceId: requireDeviceId(), category, limit });
+  return convex.mutation(api.budgets.set, { deviceId: requireDeviceId(), category, limit, today: todayKey() });
+}
+
+/**
+ * Today's free plan usage from the backend. Like useGameProgress it never throws, so a backend
+ * hiccup can't take a screen down; `null` means unavailable.
+ */
+export function useUsageQuery(): FunctionReturnType<typeof api.usage.today> | undefined {
+  const id = useDeviceId();
+  const today = todayKey();
+  const queries = useMemo(
+    (): Parameters<typeof useQueries>[0] =>
+      id ? { usage: { query: api.usage.today, args: { deviceId: id, today } } } : {},
+    [id, today],
+  );
+  const result = useQueries(queries).usage;
+  return result instanceof Error ? null : result;
+}
+
+/** Tells the backend whether this account has Pro, so free limits don't apply to subscribers. */
+export function syncProStatus(pro: boolean) {
+  return convex.action(api.usage.syncPro, { deviceId: requireDeviceId(), pro });
+}
+
+/** Backfills game progress for accounts created before the game existed. */
+export function initGame() {
+  return convex.mutation(api.game.init, { deviceId: requireDeviceId(), today: todayKey() });
+}
+
+/** Claims a daily quest; the backend checks it is really complete. Resolves to the XP awarded. */
+export function claimQuest(quest: QuestId) {
+  return convex.mutation(api.game.claimQuest, { deviceId: requireDeviceId(), quest, today: todayKey() });
 }
 
 export async function eraseAll() {

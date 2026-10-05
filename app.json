@@ -1,18 +1,27 @@
 {
   "expo": {
-    "name": "salary_survaival",
-    "slug": "salary_survaival",
+    "name": "Salary Survival",
+    "slug": "salary-survival",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
-    "scheme": "salarysurvaival",
+    "scheme": "salarysurvival",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/icon.png",
+      "bundleIdentifier": "com.nanaji.salarysurvival",
+      "config": {
+        "usesNonExemptEncryption": false
+      },
+      "infoPlist": {
+        "NSSpeechRecognitionUsageDescription": "Allow $(PRODUCT_NAME) to turn your voice into text, so you can see your words as you speak.",
+        "NSMicrophoneUsageDescription": "Allow $(PRODUCT_NAME) to use the microphone so you can add expenses by voice.",
+        "NSPhotoLibraryUsageDescription": "$(PRODUCT_NAME) does not access your photos. This is only required because a built-in image library supports loading photos."
+      }
     },
     "android": {
       "adaptiveIcon": {
-        "backgroundColor": "#E6F4FE",
+        "backgroundColor": "#16140F",
         "foregroundImage": "./assets/images/android-icon-foreground.png",
         "backgroundImage": "./assets/images/android-icon-background.png",
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
@@ -20,9 +29,14 @@
       "predictiveBackGestureEnabled": false,
       "permissions": [
         "android.permission.RECORD_AUDIO",
-        "android.permission.POST_NOTIFICATIONS"
+        "android.permission.MODIFY_AUDIO_SETTINGS"
       ],
-      "package": "com.nanaji.salary_survaival"
+      "package": "com.nanaji.salarysurvival",
+      "blockedPermissions": [
+        "android.permission.FOREGROUND_SERVICE",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PLAYBACK",
+        "android.permission.FOREGROUND_SERVICE_MICROPHONE"
+      ]
     },
     "web": {
       "output": "static",
@@ -33,23 +47,54 @@
       [
         "expo-splash-screen",
         {
-          "backgroundColor": "#0E1116",
+          "backgroundColor": "#16140F",
           "image": "./assets/images/splash-icon.png",
-          "imageWidth": 76
+          "imageWidth": 140
         }
       ],
       "expo-sqlite",
-      "expo-notifications",
       [
         "expo-audio",
         {
-          "microphonePermission": "Allow $(PRODUCT_NAME) to use the microphone so you can add expenses by voice."
+          "microphonePermission": "Allow $(PRODUCT_NAME) to use the microphone so you can add expenses by voice.",
+          "enableBackgroundPlayback": false,
+          "enableBackgroundRecording": false
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "enableSceneSupport": true
+          }
+        }
+      ],
+      [
+        "expo-speech-recognition",
+        {
+          "microphonePermission": "Allow $(PRODUCT_NAME) to use the microphone so you can add expenses by voice.",
+          "speechRecognitionPermission": "Allow $(PRODUCT_NAME) to turn your voice into text, so you can see your words as you speak."
+        }
+      ],
+      "expo-asset",
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/images/notification-icon.png",
+          "color": "#C6F45A",
+          "defaultChannel": "reminders"
         }
       ]
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "c11c333c-edfe-4cac-93a8-a643b1cbe4d8"
+      }
     }
   }
 }

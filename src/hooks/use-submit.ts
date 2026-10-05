@@ -1,7 +1,9 @@
-import { ConvexError } from 'convex/values';
 import * as Haptics from 'expo-haptics';
+import { router } from 'expo-router';
 import { useState } from 'react';
 import { Alert, Platform } from 'react-native';
+
+import { errorMessage, isLimitError } from '@/lib/limits';
 
 /**
  * Runs an async save with a pending flag, success haptics, and a friendly alert on failure.
@@ -20,11 +22,11 @@ export function useSubmit() {
       }
       return true;
     } catch (error) {
-      const message =
-        error instanceof ConvexError
-          ? String(error.data)
-          : 'Please check your internet connection and try again.';
-      Alert.alert('Could not save', message);
+      if (isLimitError(error)) {
+        router.push('/paywall');
+        return false;
+      }
+      Alert.alert('Could not save', errorMessage(error, 'Please check your internet connection and try again.'));
       return false;
     } finally {
       setPending(false);

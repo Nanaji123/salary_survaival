@@ -1,6 +1,8 @@
 import { ConvexError, v } from 'convex/values';
 
 import { mutation, query } from './_generated/server';
+import { awardXp, checkTrophies, localToday, recordActivity, setUpGame } from './gameEngine';
+import { XpReward } from './gameRules';
 import { findUser, requireUser, validateAmount, validateDate } from './lib';
 
 /** All salary cycles for the user, newest first. */
@@ -24,12 +26,20 @@ const fields = {
 };
 
 export const add = mutation({
-  args: { deviceId: v.string(), ...fields },
-  handler: async (ctx, { deviceId, amount, receivedOn, note }) => {
+  args: { deviceId: v.string(), ...fields, today: v.optional(v.string()) },
+  handler: async (ctx, { deviceId, amount, receivedOn, note, today }) => {
     const user = await requireUser(ctx, deviceId);
     validateAmount(amount);
     validateDate(receivedOn);
-    return ctx.db.insert('cycles', { userId: user._id, amount, receivedOn, note });
+    const id = await ctx.db.insert('cycles', { userId: user._id, amount, receivedOn, note });
+
+    // A new salary closes the previous cycle, which can unlock the Survivor trophy.
+    const day = localToday(today);
+    await setUpGame(ctx, user._id, day);
+    await awardXp(ctx, user._id, `salary:${id}`, XpReward.salary, day);
+    await recordActivity(ctx, user._id, day);
+    await checkTrophies(ctx, user._id, day);
+    return id;
   },
 });
 

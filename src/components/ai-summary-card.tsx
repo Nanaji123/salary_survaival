@@ -1,21 +1,29 @@
+import { FREE_LIMITS } from '@convex/plans';
 import * as Haptics from 'expo-haptics';
-import { useState } from 'react';
+import { router } from 'expo-router';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, Pressable, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 
+import { AiBasis, type BasisRow } from '@/components/ai-basis';
 import { Icon, Icons } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
+import { getCategory } from '@/constants/categories';
 import { Fonts, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { aiErrorMessage, cycleFacts, summarizeCycle } from '@/lib/ai';
 import { loadSummary, saveSummary, type SavedSummary } from '@/lib/ai-cache';
-import type { Account, Budget, Expense, SalaryCycle } from '@/lib/store';
+import { cycleProgress } from '@/lib/analytics';
+import { formatMoney } from '@/lib/format';
+import { freeLeft, useUsage } from '@/lib/limits';
+import { summarize, type Account, type Budget, type Expense, type SalaryCycle } from '@/lib/store';
 
-const MINT = '#4BE3B0';
+const MINT = '#C6F45A';
 
 /**
  * AI written summary of the current salary cycle. The last summary is kept on the device and
- * shown without calling the API; the refresh button builds a new one from the latest data.
+ * shown without calling the API. A new one is only requested after the user has seen what it is
+ * based on and confirmed.
  */
 export function AiSummaryCard({
   account,
@@ -33,10 +41,34 @@ export function AiSummaryCard({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [note, setNote] = useState<string | null>(null);
+  const [confirming, setConfirming] = useState(false);
+  const currency = account?.currency ?? 'USD';
   const expenseCount = expenses.filter((e) => e.cycleId === cycle._id).length;
+  const left = freeLeft('summary', useUsage());
   const outdated = !!saved && saved.expenseCount !== expenseCount;
 
-  async function run() {
+  // What the summary will be written from, shown before anything is sent.
+  const basis = useMemo((): BasisRow[] => {
+    const s = summarize(cycle, expenses);
+    const top = s.categories[0];
+    return [
+      { emoji: 'ledger', label: 'Expenses this cycle', value: String(s.items.length) },
+      { emoji: 'banknote', label: 'Spent so far', value: `${formatMoney(s.spent, currency)} of ${formatMoney(cycle.amount, currency)}` },
+      top
+        ? { emoji: getCategory(top.id).emoji, label: 'Biggest category', value: getCategory(top.id).label }
+        : { emoji: 'package', label: 'Biggest category', value: 'None yet' },
+      { emoji: 'alarm', label: 'Days to payday', value: String(cycleProgress(cycle).daysLeft) },
+      { emoji: 'coin', label: 'Budgets', value: budgets.length ? String(budgets.length) : 'None' },
+      {
+        emoji: 'moneyBag',
+        label: 'Savings goal',
+        value: account?.savingsGoal ? formatMoney(account.savingsGoal, currency) : 'None',
+      },
+    ];
+  }, [cycle, expenses, budgets, account, currency]);
+
+  /** Checks whether a new summary makes sense, then asks for confirmation. */
+  function ask() {
     if (expenseCount === 0) {
       setError('Add a few expenses first, then I can summarize them.');
       return;
@@ -48,6 +80,17 @@ export function AiSummaryCard({
       return;
     }
     setNote(null);
+    setError(null);
+    setConfirming(true);
+  }
+
+  async function generate() {
+    // Free plan: one summary a day. Skip the request when it is already used.
+    if (left <= 0) {
+      router.push('/paywall');
+      return;
+    }
+    setConfirming(false);
     setLoading(true);
     setError(null);
     try {
@@ -70,7 +113,7 @@ export function AiSummaryCard({
         {
           backgroundColor: theme.hero,
           experimental_backgroundImage:
-            'radial-gradient(circle at 100% 0%, rgba(75,227,176,0.28) 0%, transparent 55%)',
+            'radial-gradient(circle at 100% 0%, rgba(198,244,90,0.28) 0%, transparent 55%)',
         },
       ]}>
       <View style={styles.head}>
@@ -87,17 +130,34 @@ export function AiSummaryCard({
               : 'Your spending, explained simply'}
           </Text>
         </View>
-        {saved && !loading && (
-          <Pressable accessibilityRole="button" accessibilityLabel="Regenerate summary" hitSlop={10} onPress={run} style={styles.refresh}>
+        {saved && !loading && !confirming && (
+          <Pressable accessibilityRole="button" accessibilityLabel="Regenerate summary" hitSlop={10} onPress={ask} style={styles.refresh}>
             <Icon name={Icons.wand} size={13} color={theme.heroText} />
-            <Text variant="caption" style={{ color: theme.heroText, fontFamily: Fonts.semibold }}>
+            <Text variant="caption" style={{ color: theme.heroText, ...Fonts.semibold }}>
               Regenerate
             </Text>
           </Pressable>
         )}
       </View>
 
-      {loading ? (
+      {confirming ? (
+        <AiBasis
+          title="Here’s what I’ll read"
+          rows={basis}
+          result="3 to 4 short points: how you’re doing, where the money went, one thing to watch and one tip."
+          privacy="Your totals per category and your 5 biggest expenses (name and amount) are sent to the AI. Notes are not."
+          freeNote={
+            Number.isFinite(left)
+              ? left > 0
+                ? `Uses your free AI summary (${FREE_LIMITS.summary} on the free plan). Pro is unlimited.`
+                : 'Your free summary is used. Upgrade to Pro for unlimited summaries.'
+              : undefined
+          }
+          confirmLabel={Number.isFinite(left) && left <= 0 ? 'Unlock with Pro' : saved ? 'Write a new summary' : 'Write my summary'}
+          onConfirm={generate}
+          onCancel={() => setConfirming(false)}
+        />
+      ) : loading ? (
         <View style={styles.loading}>
           <ActivityIndicator color={MINT} />
           <Text variant="caption" style={{ color: theme.heroMuted }}>
@@ -134,11 +194,16 @@ export function AiSummaryCard({
           )}
           <Pressable
             accessibilityRole="button"
-            onPress={run}
+            onPress={error ? generate : ask}
             style={({ pressed }) => [styles.cta, pressed && { opacity: 0.85 }]}>
-            <Text style={styles.ctaText}>{error ? 'Try again' : 'Summarize my spending'}</Text>
+            <Text style={styles.ctaText}>{error ? 'Try again' : left <= 0 ? 'Unlock with Pro' : 'Summarize my spending'}</Text>
             <Icon name={Icons.arrow} size={14} color="#0E1116" />
           </Pressable>
+          {Number.isFinite(left) && (
+            <Text variant="caption" style={{ color: theme.heroMuted, textAlign: 'center' }}>
+              {left > 0 ? 'Free plan: 1 free AI summary' : 'Your free summary is used. Pro is unlimited.'}
+            </Text>
+          )}
         </>
       )}
     </View>
@@ -180,5 +245,5 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 8,
   },
-  ctaText: { color: '#0E1116', fontFamily: Fonts.bold, fontSize: 15 },
+  ctaText: { color: '#0E1116', ...Fonts.bold, fontSize: 15 },
 });

@@ -21,7 +21,7 @@ export function Section({
         {action && onAction && (
           <Pressable accessibilityRole="button" hitSlop={10} onPress={onAction}>
             {({ pressed }) => (
-              <Text variant="caption" color="primaryInk" style={{ opacity: pressed ? 0.5 : 1, fontFamily: Fonts.bold }}>
+              <Text variant="caption" color="primaryInk" style={{ opacity: pressed ? 0.5 : 1, ...Fonts.bold }}>
                 {action}
               </Text>
             )}

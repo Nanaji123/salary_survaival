@@ -3,7 +3,7 @@ import { ActivityIndicator, Platform, Pressable, StyleSheet, View } from 'react-
 
 import { Icon, type IconName } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
-import { Radius, Spacing } from '@/constants/theme';
+import { Fonts, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 type Props = {
@@ -19,13 +19,15 @@ type Props = {
 export function Button({ title, onPress, variant = 'primary', icon, disabled, loading, compact }: Props) {
   const theme = useTheme();
   const palette = {
-    primary: { bg: theme.primary, fg: theme.onPrimary },
-    secondary: { bg: theme.primarySoft, fg: theme.primaryInk },
-    ink: { bg: theme.text, fg: theme.background },
-    ghost: { bg: 'transparent', fg: theme.primaryInk },
-    danger: { bg: theme.dangerSoft, fg: theme.danger },
+    primary: { bg: theme.primary, fg: theme.onPrimary, edge: theme.primaryDeep },
+    secondary: { bg: theme.primarySoft, fg: theme.primaryInk, edge: undefined },
+    ink: { bg: theme.text, fg: theme.background, edge: theme.textSecondary },
+    ghost: { bg: 'transparent', fg: theme.primaryInk, edge: undefined },
+    danger: { bg: theme.dangerSoft, fg: theme.danger, edge: undefined },
   }[variant];
   const inactive = disabled || loading;
+  // Solid buttons sit on a darker edge and sink onto it when pressed, like a game button.
+  const edge = palette.edge && !inactive ? (compact ? 3 : 4) : 0;
 
   return (
     <Pressable
@@ -40,15 +42,20 @@ export function Button({ title, onPress, variant = 'primary', icon, disabled, lo
       style={({ pressed }) => [
         styles.base,
         compact && styles.compact,
-        { backgroundColor: palette.bg, opacity: inactive ? 0.4 : 1 },
-        pressed && { transform: [{ scale: 0.97 }], opacity: 0.9 },
+        {
+          backgroundColor: palette.bg,
+          opacity: inactive ? 0.4 : 1,
+          boxShadow: edge ? `0 ${pressed ? 1 : edge}px 0 ${palette.edge}` : undefined,
+          transform: [{ translateY: pressed ? edge - 1 : 0 }],
+        },
+        pressed && !edge && { opacity: 0.8 },
       ]}>
       {loading ? (
         <ActivityIndicator color={palette.fg} />
       ) : (
         <View style={styles.content}>
           {icon && <Icon name={icon} size={compact ? 14 : 16} color={palette.fg} />}
-          <Text variant="label" style={{ color: palette.fg, fontSize: compact ? 14 : 16 }}>
+          <Text variant="label" style={{ color: palette.fg, ...Fonts.bold, fontSize: compact ? 13 : 15 }}>
             {title}
           </Text>
         </View>
@@ -59,14 +66,14 @@ export function Button({ title, onPress, variant = 'primary', icon, disabled, lo
 
 const styles = StyleSheet.create({
   base: {
-    height: 56,
+    height: 50,
     borderRadius: Radius.pill,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: Spacing.four,
   },
   compact: {
-    height: 40,
+    height: 36,
     paddingHorizontal: Spacing.three,
   },
   content: {

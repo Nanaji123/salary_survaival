@@ -8,11 +8,10 @@ import Svg, { Circle, Path } from 'react-native-svg';
 import { Icon, Icons, type IconName } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
 import { Fonts, MaxContentWidth, Radius, Spacing } from '@/constants/theme';
-import { requestOnboardingPermissions } from '@/lib/permissions';
 import { signInWithDevice } from '@/lib/store';
 
 const INK = '#0E1116';
-const MINT = '#4BE3B0';
+const MINT = '#C6F45A';
 const MUTED = 'rgba(255,255,255,0.62)';
 
 const FEATURES: { icon: IconName; title: string; body: string }[] = [
@@ -29,7 +28,6 @@ export default function WelcomeScreen() {
     setLoading(true);
     try {
       const onboarded = await signInWithDevice();
-      await requestOnboardingPermissions();
       // A returning user is taken straight to Home when the account flips to onboarded.
       if (!onboarded) router.push('/setup');
     } catch {
@@ -47,7 +45,7 @@ export default function WelcomeScreen() {
           paddingTop: insets.top + Spacing.four,
           paddingBottom: insets.bottom + Spacing.three,
           experimental_backgroundImage:
-            'radial-gradient(circle at 85% 12%, rgba(75,227,176,0.22) 0%, transparent 45%), radial-gradient(circle at 0% 70%, rgba(91,91,214,0.16) 0%, transparent 40%)',
+            'radial-gradient(circle at 85% 12%, rgba(198,244,90,0.22) 0%, transparent 45%), radial-gradient(circle at 0% 70%, rgba(255,150,60,0.16) 0%, transparent 40%)',
         },
       ]}>
       <StatusBar style="light" />
@@ -175,7 +173,7 @@ const styles = StyleSheet.create({
   },
   brandText: {
     color: '#FFFFFF',
-    fontFamily: Fonts.bold,
+    ...Fonts.bold,
     fontSize: 16,
   },
   illustration: {
@@ -190,14 +188,14 @@ const styles = StyleSheet.create({
   },
   headline: {
     color: '#FFFFFF',
-    fontFamily: Fonts.extrabold,
+    ...Fonts.extrabold,
     fontSize: 36,
     lineHeight: 42,
     letterSpacing: -1,
   },
   sub: {
     color: MUTED,
-    fontFamily: Fonts.medium,
+    ...Fonts.medium,
     fontSize: 15,
     lineHeight: 22,
   },
@@ -213,19 +211,19 @@ const styles = StyleSheet.create({
     width: 38,
     height: 38,
     borderRadius: 12,
-    backgroundColor: 'rgba(75,227,176,0.12)',
+    backgroundColor: 'rgba(198,244,90,0.12)',
     alignItems: 'center',
     justifyContent: 'center',
   },
   featureTitle: {
     color: '#FFFFFF',
-    fontFamily: Fonts.bold,
+    ...Fonts.bold,
     fontSize: 15,
     lineHeight: 20,
   },
   featureBody: {
     color: MUTED,
-    fontFamily: Fonts.medium,
+    ...Fonts.medium,
     fontSize: 13,
     lineHeight: 18,
   },
@@ -240,7 +238,7 @@ const styles = StyleSheet.create({
   },
   ctaText: {
     color: INK,
-    fontFamily: Fonts.bold,
+    ...Fonts.bold,
     fontSize: 17,
   },
   note: {
@@ -251,7 +249,7 @@ const styles = StyleSheet.create({
   },
   noteText: {
     color: MUTED,
-    fontFamily: Fonts.medium,
+    ...Fonts.medium,
     fontSize: 12,
   },
 });

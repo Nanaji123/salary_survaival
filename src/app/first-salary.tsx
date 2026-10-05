@@ -17,7 +17,7 @@ export default function FirstSalaryScreen() {
         icon={Icons.salary}
       />
       <SalaryForm
-        currency={account?.currency ?? 'INR'}
+        currency={account?.currency ?? 'USD'}
         submitLabel="Start planning"
         onSubmit={async (input) => {
           await addCycle(input);

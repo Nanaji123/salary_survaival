@@ -2,7 +2,7 @@ import { router } from 'expo-router';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import type { CategoryId } from '@/constants/categories';
-import { requirePro } from '@/lib/subscription';
+import { openAddExpense } from '@/lib/limits';
 
 import { tap } from '@/components/ui/form';
 import { Icon, Icons, type IconName } from '@/components/ui/icon';
@@ -14,7 +14,7 @@ import { useTheme } from '@/hooks/use-theme';
 export type Suggestion = { label: string; icon?: IconName; onPress: () => void };
 
 function addExpense(title: string, category: CategoryId) {
-  if (requirePro()) router.push({ pathname: '/expense', params: { title, category } });
+  openAddExpense({ title, category });
 }
 
 /** Quick-start suggestions for screens that have no expenses yet. */
@@ -79,7 +79,7 @@ export function EmptyState({
                   { backgroundColor: theme.card, borderColor: theme.border, opacity: pressed ? 0.6 : 1 },
                 ]}>
                 <Icon name={s.icon ?? Icons.add} size={13} color={theme.primaryInk} />
-                <Text variant="caption" style={{ fontFamily: Fonts.semibold }}>
+                <Text variant="caption" style={{ ...Fonts.semibold }}>
                   {s.label}
                 </Text>
               </Pressable>

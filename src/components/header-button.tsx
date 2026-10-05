@@ -19,7 +19,7 @@ export function HeaderTextButton({
       hitSlop={10}
       onPress={onPress}
       style={({ pressed }) => ({ opacity: pressed ? 0.5 : 1, paddingHorizontal: 6 })}>
-      <Text variant="label" color="primaryInk" style={bold && { fontFamily: Fonts.bold }}>
+      <Text variant="label" color="primaryInk" style={bold && { ...Fonts.bold }}>
         {title}
       </Text>
     </Pressable>

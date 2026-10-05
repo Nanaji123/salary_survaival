@@ -1,3 +1,4 @@
+import { FREE_LIMITS } from '@convex/plans';
 import * as Haptics from 'expo-haptics';
 import { router } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
@@ -6,6 +7,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View }
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AiBasis, type BasisRow } from '@/components/ai-basis';
 import { CategoryIcon } from '@/components/ui/category-icon';
 import { Icon, Icons } from '@/components/ui/icon';
 import { Text } from '@/components/ui/text';
@@ -14,33 +16,38 @@ import { Fonts, MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { aiErrorMessage, applyPlan, historyFacts, planSalary, type SalaryPlan } from '@/lib/ai';
 import { loadPlan, savePlan, type SavedPlan } from '@/lib/ai-cache';
 import { formatMoney, parseAmount, sanitizeAmountInput } from '@/lib/format';
-import { currentCycle, getDeviceId, useAccount, useCycles, useExpenses } from '@/lib/store';
+import { freeLeft, useUsage } from '@/lib/limits';
+import { currentCycle, getDeviceId, summarize, useAccount, useBudgets, useCycles, useExpenses } from '@/lib/store';
 
 const INK = '#0E1116';
 const CARD = 'rgba(255,255,255,0.06)';
 const LINE = 'rgba(255,255,255,0.1)';
-const MINT = '#4BE3B0';
+const MINT = '#C6F45A';
 const MUTED = 'rgba(255,255,255,0.62)';
 
 type Draft = { goal: string; limits: Partial<Record<CategoryId, string>> };
 
 /**
- * AI salary plan. The last plan is saved on the device and shown instantly; the API is only
- * called the first time or when the user taps Regenerate (which uses the current salary).
+ * AI salary plan. The last plan is saved on the device and shown instantly. A new plan is only
+ * requested after the user has seen what it is based on and confirmed.
  */
 export default function AiPlanScreen() {
   const insets = useSafeAreaInsets();
   const account = useAccount();
   const cycles = useCycles();
   const expenses = useExpenses();
+  const budgets = useBudgets();
+  const usage = useUsage();
   const cycle = currentCycle(cycles);
   const currency = account?.currency ?? 'USD';
   const deviceId = getDeviceId();
 
   const [saved, setSaved] = useState<SavedPlan | null>(() => loadPlan(deviceId));
   const [error, setError] = useState<string | null>(null);
-  // Attempt 0 means "use what is saved"; a first-time visit starts at 1 to generate right away.
-  const [attempt, setAttempt] = useState(() => (loadPlan(deviceId) ? 0 : 1));
+  // Each confirmed request bumps the attempt; 0 means nothing has been requested yet.
+  const [attempt, setAttempt] = useState(0);
+  // Without a saved plan, start on the confirmation that explains what the plan is based on.
+  const [confirming, setConfirming] = useState(() => !loadPlan(deviceId));
   const [fetched, setFetched] = useState(0);
   const [applying, setApplying] = useState(false);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -76,8 +83,44 @@ export default function AiPlanScreen() {
   function regenerate() {
     setError(null);
     setDraft(null);
+    setConfirming(true);
+  }
+
+  function generate() {
+    if (freeLeft('plan', usage) <= 0) {
+      router.push('/paywall');
+      return;
+    }
+    setConfirming(false);
+    setError(null);
+    setDraft(null);
     setAttempt((n) => n + 1);
   }
+
+  // What the plan will be built from, shown before anything is sent.
+  const basis = useMemo((): BasisRow[] => {
+    if (!cycles || !expenses || !cycle) return [];
+    const looked = cycles.slice(0, 4);
+    const count = looked.reduce((n, c) => n + summarize(c, expenses).items.length, 0);
+    const totals = new Map<CategoryId, number>();
+    for (const c of looked) for (const x of summarize(c, expenses).categories) totals.set(x.id, (totals.get(x.id) ?? 0) + x.amount);
+    const top = [...totals.entries()].sort((a, b) => b[1] - a[1])[0];
+    return [
+      { emoji: 'banknote', label: 'Salary to plan', value: formatMoney(cycle.amount, currency) },
+      { emoji: 'scroll', label: 'Salary cycles read', value: String(looked.length) },
+      { emoji: 'ledger', label: 'Expenses in them', value: String(count) },
+      top
+        ? { emoji: getCategory(top[0]).emoji, label: 'Biggest category', value: getCategory(top[0]).label }
+        : { emoji: 'package', label: 'Biggest category', value: 'None yet' },
+      {
+        emoji: 'moneyBag',
+        label: 'Current savings goal',
+        value: account?.savingsGoal ? formatMoney(account.savingsGoal, currency) : 'None',
+      },
+      { emoji: 'coin', label: 'Current budgets', value: budgets?.length ? String(budgets.length) : 'None' },
+    ];
+  }, [cycles, expenses, cycle, account, budgets, currency]);
+  const planLeft = freeLeft('plan', usage);
 
   function startEdit() {
     if (!saved) return;
@@ -137,7 +180,7 @@ export default function AiPlanScreen() {
         styles.container,
         {
           experimental_backgroundImage:
-            'radial-gradient(circle at 90% 0%, rgba(75,227,176,0.24) 0%, transparent 45%), radial-gradient(circle at 0% 60%, rgba(91,91,214,0.16) 0%, transparent 40%)',
+            'radial-gradient(circle at 90% 0%, rgba(198,244,90,0.24) 0%, transparent 45%), radial-gradient(circle at 0% 60%, rgba(255,150,60,0.16) 0%, transparent 40%)',
         },
       ]}>
       <StatusBar style="light" />
@@ -161,6 +204,24 @@ export default function AiPlanScreen() {
 
         {!cycle && cycles !== undefined ? (
           <Text style={styles.sub}>Add your salary first and I will build a plan around it.</Text>
+        ) : confirming && cycle ? (
+          <AiBasis
+            title="Here’s what I’ll look at"
+            rows={basis}
+            result="A savings goal and 5 to 8 category budgets that fit inside your salary. Nothing changes until you tap Apply."
+            privacy="Only your salary and spending totals per category are sent to the AI. Expense names and notes are not."
+            freeNote={
+              Number.isFinite(planLeft)
+                ? planLeft > 0
+                  ? `Uses your free AI plan (${FREE_LIMITS.plan} on the free plan). Pro is unlimited.`
+                  : 'Your free AI plan is used. Upgrade to Pro for unlimited plans.'
+                : undefined
+            }
+            confirmLabel={Number.isFinite(planLeft) && planLeft <= 0 ? 'Unlock with Pro' : saved ? 'Generate a new plan' : 'Generate my plan'}
+            cancelLabel={saved ? 'Keep my current plan' : 'Not now'}
+            onConfirm={generate}
+            onCancel={() => (saved ? setConfirming(false) : router.back())}
+          />
         ) : loading ? (
           <View style={styles.loading}>
             <ActivityIndicator color={MINT} />
@@ -174,7 +235,7 @@ export default function AiPlanScreen() {
               <Icon name={Icons.alert} size={14} color="#FFB84D" />
               <Text style={styles.hintText}>{error}</Text>
             </View>
-            <Pressable accessibilityRole="button" onPress={regenerate} style={styles.cta}>
+            <Pressable accessibilityRole="button" onPress={generate} style={styles.cta}>
               <Text style={styles.ctaText}>Try again</Text>
             </Pressable>
           </View>
@@ -332,7 +393,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: 12,
     paddingVertical: 6,
   },
-  pillText: { color: INK, fontFamily: Fonts.extrabold, fontSize: 11, letterSpacing: 1 },
+  pillText: { color: INK, ...Fonts.extrabold, fontSize: 11, letterSpacing: 1 },
   close: {
     width: 32,
     height: 32,
@@ -343,22 +404,22 @@ const styles = StyleSheet.create({
   },
   title: {
     color: '#FFFFFF',
-    fontFamily: Fonts.extrabold,
+    ...Fonts.extrabold,
     fontSize: 38,
     lineHeight: 44,
     letterSpacing: -1,
     marginTop: Spacing.three,
   },
-  sub: { color: MUTED, fontFamily: Fonts.medium, fontSize: 15, lineHeight: 22 },
+  sub: { color: MUTED, ...Fonts.medium, fontSize: 15, lineHeight: 22 },
   loading: { gap: Spacing.three, alignItems: 'flex-start', marginTop: Spacing.three },
   summary: {
-    backgroundColor: 'rgba(75,227,176,0.1)',
+    backgroundColor: 'rgba(198,244,90,0.1)',
     borderRadius: Radius.lg,
     borderCurve: 'continuous',
     padding: Spacing.three,
   },
-  summaryText: { color: '#FFFFFF', fontFamily: Fonts.medium, fontSize: 15, lineHeight: 22 },
-  savedMeta: { color: 'rgba(255,255,255,0.5)', fontFamily: Fonts.medium, fontSize: 12, marginTop: 8 },
+  summaryText: { color: '#FFFFFF', ...Fonts.medium, fontSize: 15, lineHeight: 22 },
+  savedMeta: { color: 'rgba(255,255,255,0.5)', ...Fonts.medium, fontSize: 12, marginTop: 8 },
   figures: { flexDirection: 'row', gap: Spacing.three - 4 },
   figure: {
     flex: 1,
@@ -370,9 +431,9 @@ const styles = StyleSheet.create({
     padding: Spacing.three,
     gap: 4,
   },
-  figLabel: { color: 'rgba(255,255,255,0.45)', fontFamily: Fonts.bold, fontSize: 10.5, letterSpacing: 1 },
-  figValue: { color: '#FFFFFF', fontFamily: Fonts.extrabold, fontSize: 22, letterSpacing: -0.4 },
-  section: { color: '#FFFFFF', fontFamily: Fonts.bold, fontSize: 17, marginTop: Spacing.two },
+  figLabel: { color: 'rgba(255,255,255,0.45)', ...Fonts.bold, fontSize: 10.5, letterSpacing: 1 },
+  figValue: { color: '#FFFFFF', ...Fonts.extrabold, fontSize: 22, letterSpacing: -0.4 },
+  section: { color: '#FFFFFF', ...Fonts.bold, fontSize: 17, marginTop: Spacing.two },
   row: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -384,9 +445,9 @@ const styles = StyleSheet.create({
     borderCurve: 'continuous',
     padding: 12,
   },
-  rowTitle: { color: '#FFFFFF', fontFamily: Fonts.bold, fontSize: 15 },
-  rowSub: { color: MUTED, fontFamily: Fonts.medium, fontSize: 12.5 },
-  rowAmount: { color: '#FFFFFF', fontFamily: Fonts.extrabold, fontSize: 15, fontVariant: ['tabular-nums'] },
+  rowTitle: { color: '#FFFFFF', ...Fonts.bold, fontSize: 15 },
+  rowSub: { color: MUTED, ...Fonts.medium, fontSize: 12.5 },
+  rowAmount: { color: '#FFFFFF', ...Fonts.extrabold, fontSize: 15, fontVariant: ['tabular-nums'] },
   hint: {
     flexDirection: 'row',
     gap: 8,
@@ -395,7 +456,7 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     padding: 12,
   },
-  hintText: { flex: 1, color: '#FFD9A0', fontFamily: Fonts.medium, fontSize: 13, lineHeight: 18 },
+  hintText: { flex: 1, color: '#FFD9A0', ...Fonts.medium, fontSize: 13, lineHeight: 18 },
   cta: {
     height: 58,
     borderRadius: Radius.pill,
@@ -404,10 +465,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     gap: Spacing.two,
-    boxShadow: '0 12px 30px rgba(75,227,176,0.35)',
+    boxShadow: '0 12px 30px rgba(198,244,90,0.35)',
     marginTop: Spacing.two,
   },
-  ctaText: { color: INK, fontFamily: Fonts.bold, fontSize: 17 },
+  ctaText: { color: INK, ...Fonts.bold, fontSize: 17 },
   secondaryRow: { flexDirection: 'row', gap: Spacing.two },
   secondary: {
     flex: 1,
@@ -419,14 +480,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: 7,
   },
-  secondaryText: { color: '#FFFFFF', fontFamily: Fonts.semibold, fontSize: 15 },
+  secondaryText: { color: '#FFFFFF', ...Fonts.semibold, fontSize: 15 },
   moneyInput: {
     minWidth: 110,
     height: 40,
     borderRadius: Radius.sm,
     backgroundColor: 'rgba(255,255,255,0.1)',
     color: '#FFFFFF',
-    fontFamily: Fonts.extrabold,
+    ...Fonts.extrabold,
     fontSize: 16,
     paddingHorizontal: 10,
     padding: 0,
